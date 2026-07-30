@@ -1,0 +1,278 @@
+/* Elevrics Portal — internal shell.
+   Tokens mirror elevrics-site/css/styles.css so the portal reads as the same
+   product as the marketing site. Light theme, navy chrome, white cards. */
+
+:root {
+  --navy:      #071833;
+  --purple:    #7B2CBF;
+  --teal:      #00A19A;
+  --blue:      #3C6FF0;
+  --offwhite:  #F7F8FB;
+  --lightgray: #D3D7E0;
+  --midgray:   #6C7383;
+  --charcoal:  #22222A;
+  --white:     #FFFFFF;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background: var(--offwhite);
+  color: var(--charcoal);
+  line-height: 1.6;
+}
+
+/* ---------- Nav ---------- */
+
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--navy);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 14px 32px;
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.nav-logo-text {
+  color: var(--white);
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.nav-tag {
+  color: var(--lightgray);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding-left: 10px;
+  margin-left: 2px;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nav-links a {
+  display: block;
+  padding: 7px 14px;
+  border-radius: 8px;
+  color: var(--lightgray);
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-links a:hover { background: rgba(255, 255, 255, 0.08); color: var(--white); }
+.nav-links a[aria-current='page'] { background: rgba(255, 255, 255, 0.14); color: var(--white); }
+
+/* ---------- Layout ---------- */
+
+main {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 56px 32px 80px;
+}
+
+.page-head { margin-bottom: 40px; }
+
+.page-head h1 {
+  margin: 0 0 8px;
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--navy);
+}
+
+.page-head p {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--midgray);
+}
+
+.section-label {
+  margin: 0 0 16px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--midgray);
+}
+
+.section + .section { margin-top: 48px; }
+
+/* ---------- Module cards ---------- */
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  background: var(--white);
+  border: 1px solid var(--lightgray);
+  border-radius: 14px;
+  padding: 28px;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+a.card:hover {
+  box-shadow: 0 6px 28px rgba(7, 24, 51, 0.08);
+  transform: translateY(-2px);
+}
+
+.card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--white);
+}
+
+.icon-purple { background: linear-gradient(180deg, #9B5CF6, var(--purple)); }
+.icon-blue   { background: linear-gradient(180deg, #6D8EF8, var(--blue)); }
+.icon-teal   { background: linear-gradient(180deg, #2EC4BD, var(--teal)); }
+.icon-gray   { background: linear-gradient(180deg, #8B93A3, var(--midgray)); }
+
+.card h2 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--navy);
+}
+
+.card p {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--midgray);
+}
+
+.card-meta {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--offwhite);
+  font-size: 0.78rem;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  color: var(--midgray);
+}
+
+/* ---------- Empty / placeholder states ---------- */
+
+.empty {
+  background: var(--white);
+  border: 1px dashed var(--lightgray);
+  border-radius: 14px;
+  padding: 40px 32px;
+  text-align: center;
+}
+
+.empty h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.empty p {
+  margin: 0 auto;
+  max-width: 52ch;
+  font-size: 0.92rem;
+  color: var(--midgray);
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(123, 44, 191, 0.1);
+  color: var(--purple);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+  margin-left: 10px;
+}
+
+/* ---------- Roadmap list ---------- */
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--white);
+  border: 1px solid var(--lightgray);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.steps li {
+  display: flex;
+  gap: 16px;
+  padding: 18px 24px;
+  font-size: 0.92rem;
+}
+
+.steps li + li { border-top: 1px solid var(--offwhite); }
+
+.steps .step-n {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--offwhite);
+  color: var(--midgray);
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.steps strong { color: var(--navy); font-weight: 600; }
+.steps span.detail { color: var(--midgray); }
+
+footer {
+  border-top: 1px solid var(--lightgray);
+  padding: 24px 32px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--midgray);
+}
+
+@media (max-width: 640px) {
+  nav { padding: 12px 18px; flex-wrap: wrap; }
+  .nav-tag { display: none; }
+  main { padding: 36px 18px 56px; }
+  .page-head h1 { font-size: 1.6rem; }
+}

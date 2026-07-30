@@ -1,0 +1,14 @@
+{
+  "name": "elevrics-portal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Internal portal shell, path router and admin console for Elevrics",
+  "type": "module",
+  "scripts": {
+    "test": "node --test functions/router.test.mjs",
+    "dev": "wrangler pages dev ."
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

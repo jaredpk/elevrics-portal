@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin · Elevrics Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/portal.css">
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">
+    <svg width="24" height="20" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="n1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9B5CF6"/><stop offset="100%" stop-color="#7B2CBF"/></linearGradient>
+        <linearGradient id="n2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6D8EF8"/><stop offset="100%" stop-color="#3C6FF0"/></linearGradient>
+        <linearGradient id="n3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2EC4BD"/><stop offset="100%" stop-color="#00A19A"/></linearGradient>
+      </defs>
+      <rect x="0" y="11" width="6" height="9" rx="2" fill="url(#n1)"/>
+      <rect x="9" y="5.5" width="6" height="14.5" rx="2" fill="url(#n2)"/>
+      <rect x="18" y="0" width="6" height="20" rx="2" fill="url(#n3)"/>
+    </svg>
+    <span class="nav-logo-text">Elevrics</span>
+    <span class="nav-tag">Portal</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/solayard">SolaYard Intel</a></li>
+    <li><a href="/opportunities">Opportunities</a></li>
+    <li><a href="/pathfinder">Pathfinder</a></li>
+    <li><a href="/admin/" aria-current="page">Admin</a></li>
+  </ul>
+</nav>
+
+<main>
+
+  <div class="page-head">
+    <h1>Admin <span class="badge">Shell</span></h1>
+    <p>Cross-tenant console for the client portal. This page is a skeleton —
+       it is not wired to any data source, and no clients are provisioned.
+       It exists so the client tier has somewhere to land when the first
+       engagement is real.</p>
+  </div>
+
+  <section class="section">
+    <p class="section-label">Tenants</p>
+    <div class="empty">
+      <h2>No tenants provisioned</h2>
+      <p>Each client will be served at <code>{client}.elevrics.ai</code> by a
+         single host-aware app, with its own Postgres schema. Provisioning a
+         tenant should stay a database write — that depends on wildcard DNS,
+         a wildcard certificate and a wildcard Access policy being configured
+         before the first client is onboarded.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <p class="section-label">Before the first client</p>
+    <ol class="steps">
+      <li>
+        <span class="step-n">1</span>
+        <span><strong>Wildcard DNS + certificate.</strong>
+        <span class="detail">One <code>*.elevrics.ai</code> record and the
+        Universal SSL wildcard. Never issue per-client certificates — those are
+        published individually to Certificate Transparency logs and would expose
+        the client roster.</span></span>
+      </li>
+      <li>
+        <span class="step-n">2</span>
+        <span><strong>Wildcard Access policy.</strong>
+        <span class="detail">One Access application covering
+        <code>*.elevrics.ai</code>, scoped per tenant by email domain, so
+        onboarding never requires touching Cloudflare configuration.</span></span>
+      </li>
+      <li>
+        <span class="step-n">3</span>
+        <span><strong>Tenant model.</strong>
+        <span class="detail">Organizations, memberships, roles. Postgres
+        schema-per-tenant; isolation enforced at the data-access layer, never
+        left to individual route handlers.</span></span>
+      </li>
+      <li>
+        <span class="step-n">4</span>
+        <span><strong>Host/session cross-check.</strong>
+        <span class="detail">Reject any request where the tenant implied by the
+        hostname disagrees with the tenant in the session claims. This is the
+        backstop against a missing query filter.</span></span>
+      </li>
+      <li>
+        <span class="step-n">5</span>
+        <span><strong>Audit logging.</strong>
+        <span class="detail">Who viewed which tenant's data, and when. Required
+        by the first law-firm security questionnaire, and it is the product
+        Elevrics sells.</span></span>
+      </li>
+    </ol>
+  </section>
+
+  <section class="section">
+    <p class="section-label">Note on placement</p>
+    <div class="empty">
+      <h2>This console should move before it holds real client data</h2>
+      <p>It currently shares an origin with the internal modules, which means an
+         XSS in any of them could reach an admin session. That is acceptable
+         while the console is inert. Once it can read client data, split it to
+         its own origin at <code>admin.elevrics.ai</code> — the markup and
+         styles carry over unchanged.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer>Elevrics internal · not indexed · access controlled by Cloudflare Access</footer>
+
+</body>
+</html>

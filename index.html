@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Elevrics Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/portal.css">
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">
+    <svg width="24" height="20" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="n1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9B5CF6"/><stop offset="100%" stop-color="#7B2CBF"/></linearGradient>
+        <linearGradient id="n2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6D8EF8"/><stop offset="100%" stop-color="#3C6FF0"/></linearGradient>
+        <linearGradient id="n3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2EC4BD"/><stop offset="100%" stop-color="#00A19A"/></linearGradient>
+      </defs>
+      <rect x="0" y="11" width="6" height="9" rx="2" fill="url(#n1)"/>
+      <rect x="9" y="5.5" width="6" height="14.5" rx="2" fill="url(#n2)"/>
+      <rect x="18" y="0" width="6" height="20" rx="2" fill="url(#n3)"/>
+    </svg>
+    <span class="nav-logo-text">Elevrics</span>
+    <span class="nav-tag">Portal</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="/" aria-current="page">Home</a></li>
+    <li><a href="/solayard">SolaYard Intel</a></li>
+    <li><a href="/opportunities">Opportunities</a></li>
+    <li><a href="/pathfinder">Pathfinder</a></li>
+    <li><a href="/admin/">Admin</a></li>
+  </ul>
+</nav>
+
+<main>
+
+  <div class="page-head">
+    <h1>Portal</h1>
+    <p>Internal tools, one login. Authentication is handled by Cloudflare Access
+       at the edge — every module below verifies the same token independently.</p>
+  </div>
+
+  <section class="section">
+    <p class="section-label">Modules</p>
+    <div class="card-grid">
+
+      <a class="card" href="/solayard">
+        <div class="card-icon icon-purple">SI</div>
+        <h2>SolaYard Intel</h2>
+        <p>External deadlines and signals the SolaYard roadmap depends on —
+           funding cycles, plug-in solar legislation, UL 3700 milestones.</p>
+        <div class="card-meta">/solayard · Flask · SQLite</div>
+      </a>
+
+      <a class="card" href="/opportunities">
+        <div class="card-icon icon-blue">OP</div>
+        <h2>Opportunities</h2>
+        <p>Lead-intelligence scanner and review queue. Scores public sources
+           against the Tier 1 offers with an explainable rules engine.</p>
+        <div class="card-meta">/opportunities · Express · SQLite</div>
+      </a>
+
+      <a class="card" href="/pathfinder">
+        <div class="card-icon icon-teal">PF</div>
+        <h2>Pathfinder</h2>
+        <p>Relocation screen — 103 locations across 40 factors, with weighting,
+           must-have thresholds and per-row confidence bands.</p>
+        <div class="card-meta">/pathfinder · Next.js · static dataset</div>
+      </a>
+
+      <a class="card" href="/admin/">
+        <div class="card-icon icon-gray">AD</div>
+        <h2>Admin</h2>
+        <p>Cross-tenant console for the client portal. Shell only — there are
+           no tenants provisioned yet.</p>
+        <div class="card-meta">/admin · shell</div>
+      </a>
+
+    </div>
+  </section>
+
+</main>
+
+<footer>Elevrics internal · not indexed · access controlled by Cloudflare Access</footer>
+
+</body>
+</html>
