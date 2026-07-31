@@ -58,9 +58,23 @@ npm test             # router unit tests — no network, no wrangler
 npx wrangler pages dev .
 ```
 
-`npm test` covers prefix matching, redirect rewriting and cookie scoping. The
-proxy path itself needs live origins, so it is exercised against the deployed
-Pages preview rather than locally.
+`npm test` covers prefix matching, redirect rewriting and cookie scoping.
+
+For an end-to-end check against the real apps, start the three origins locally
+and run the integration harness — it imports the *actual* `onRequest` from
+`functions/[[path]].js` and only swaps the module origins for localhost, so it
+exercises the real routing code rather than a reimplementation:
+
+```bash
+# solayard-intel   URL_PREFIX=/solayard        flask --app app run --port 8077
+# opportunities    URL_PREFIX=/opportunities   PORT=8099 npm start
+# relocation                                   PORT=3999 npm start
+npm run harness      # http://127.0.0.1:8090
+```
+
+The check that matters is not just that each path returns 200, but that the URLs
+*inside* the proxied HTML are portal-correct and resolve through the router —
+`/solayard/reference`, `/opportunities/styles.css`, and so on.
 
 ---
 

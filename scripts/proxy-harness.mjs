@@ -1,0 +1,39 @@
+/**
+ * Integration harness: runs the REAL portal router (functions/[[path]].js)
+ * in front of the REAL local app origins, so the prefix-strip + rewrite design
+ * is exercised end to end rather than unit-tested in isolation.
+ */
+import http from 'node:http';
+import { onRequest, MODULES } from '../functions/[[path]].js';
+
+// Point the module origins at the locally running apps.
+MODULES['/solayard'].origin = 'http://127.0.0.1:8077';
+MODULES['/opportunities'].origin = 'http://127.0.0.1:8099';
+MODULES['/pathfinder'].origin = 'http://127.0.0.1:3999';
+
+const server = http.createServer(async (req, res) => {
+  const url = `http://127.0.0.1:8090${req.url}`;
+  const headers = new Headers();
+  for (const [k, v] of Object.entries(req.headers)) {
+    if (typeof v === 'string') headers.set(k, v);
+  }
+
+  const request = new Request(url, { method: req.method, headers });
+  // next() falls through to the static shell in real Pages Functions.
+  const next = async () => new Response('SHELL', { status: 200, headers: { 'x-served-by': 'shell' } });
+
+  let out;
+  try {
+    out = await onRequest({ request, next });
+  } catch (e) {
+    out = new Response(`harness error: ${e.stack}`, { status: 500 });
+  }
+
+  res.statusCode = out.status;
+  out.headers.forEach((v, k) => {
+    if (k.toLowerCase() !== 'content-encoding') res.setHeader(k, v);
+  });
+  res.end(Buffer.from(await out.arrayBuffer()));
+});
+
+server.listen(8090, '127.0.0.1', () => console.log('harness on 8090'));

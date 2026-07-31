@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test functions/router.test.mjs",
-    "dev": "wrangler pages dev ."
+    "dev": "wrangler pages dev .",
+    "harness": "node scripts/proxy-harness.mjs"
   },
   "engines": {
     "node": ">=20"
