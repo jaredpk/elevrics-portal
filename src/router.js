@@ -11,30 +11,18 @@
  * Anything that doesn't match a module prefix falls through to the static
  * shell (launcher at /, admin console at /admin).
  *
- * Transport-agnostic on purpose: handleRequest() takes the asset fallback as a
- * parameter, so the Worker passes env.ASSETS.fetch and the local integration
- * harness passes a stub. The routing logic under test is the deployed logic.
+ * Transport-agnostic on purpose: handleRequest() takes the asset fallback and
+ * the chrome injector as parameters, so the Worker passes env.ASSETS.fetch and
+ * an HTMLRewriter-backed injector while the local integration harness passes a
+ * stub and nothing. The routing logic under test is the deployed logic.
+ *
+ * What the portal CONTAINS lives in modules.js — one registry behind the
+ * proxying here, the nav, and the launcher grid.
  */
 
-export const MODULES = {
-  '/solayard': {
-    origin: 'https://solayard-intel.fly.dev',
-    // Flask registers its 9 routes at root. Strip the prefix inbound; the app
-    // emits portal-space URLs itself via its URL_PREFIX env var.
-    stripPrefix: true,
-  },
-  '/opportunities': {
-    origin: 'https://elevrics-opportunities.fly.dev',
-    // Express router + static assets, same arrangement as above.
-    stripPrefix: true,
-  },
-  '/pathfinder': {
-    origin: 'https://elevrics-relocation.fly.dev',
-    // Next.js basePath means the app expects to see /pathfinder in the path
-    // and generates its own prefixed asset URLs. Pass the path through whole.
-    stripPrefix: false,
-  },
-};
+import { MODULES } from './modules.js';
+
+export { MODULES };
 
 /**
  * Hostnames parked on this Worker that are NOT the portal.
@@ -57,8 +45,18 @@ export function matchParkedHost(hostname) {
   return PARKED_HOSTS[hostname] ?? null;
 }
 
+/**
+ * Find the module that should serve this path, if any.
+ *
+ * Registry entries without an `origin` are portal-owned pages (the launcher,
+ * the admin shell) — they belong in the nav but there is nowhere to forward
+ * them, so they are skipped here and fall through to the assets binding. That
+ * check has to come first: "/" is a registry entry, and every path starts
+ * with it.
+ */
 export function matchModule(pathname) {
   for (const [prefix, config] of Object.entries(MODULES)) {
+    if (!config.origin) continue;
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
       return { prefix, config };
     }
@@ -98,12 +96,17 @@ export function reprefixCookiePath(cookie, prefix) {
 /**
  * @param request  the incoming Request
  * @param serveAssets  fallback for anything that isn't a module route
+ * @param injectChrome  optional (response, pathname) => Response that fills the
+ *   nav placeholders. Omitted outside the Workers runtime, where HTMLRewriter
+ *   doesn't exist; the router routes identically either way.
  */
-export async function handleRequest(request, serveAssets) {
+export async function handleRequest(request, serveAssets, injectChrome) {
   const url = new URL(request.url);
 
   // Parked hosts are checked before anything path-based, so no request on a
   // public hostname can reach a module.
+  // Deliberately never injected with portal chrome: a parked host is public,
+  // and its placeholder must not advertise the internal module list.
   const parked = matchParkedHost(url.hostname);
   if (parked) {
     const assetUrl = new URL(url);
@@ -116,7 +119,13 @@ export async function handleRequest(request, serveAssets) {
   }
 
   const match = matchModule(url.pathname);
-  if (!match) return serveAssets(request);
+  if (!match) {
+    // The portal's own pages (and its 404s) — chrome goes on here. Proxied
+    // module responses below still pass through bare; giving them the nav too
+    // is the next phase, and wants its own testing.
+    const response = await serveAssets(request);
+    return injectChrome ? injectChrome(response, url.pathname) : response;
+  }
 
   const { prefix, config } = match;
 

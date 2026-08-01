@@ -75,6 +75,44 @@ test('falls through for the shell and admin', () => {
   assert.equal(matchModule('/css/portal.css'), null);
 });
 
+test('a registry entry with no origin is never proxied', () => {
+  // "/" and "/admin" are in the registry so they appear in the nav. Nothing to
+  // forward them to, and "/" is a prefix of every path — both must fall through.
+  for (const [prefix, config] of Object.entries(MODULES)) {
+    if (config.origin) continue;
+    assert.equal(matchModule(prefix), null, `${prefix} was treated as a proxy target`);
+  }
+});
+
+test('chrome is injected into the portal\'s own pages', async () => {
+  const { serve } = assetSpy();
+  const calls = [];
+  const inject = (response, pathname) => {
+    calls.push(pathname);
+    return response;
+  };
+  await handleRequest(new Request('https://portal.elevrics.ai/admin/'), serve, inject);
+  assert.deepEqual(calls, ['/admin/']);
+});
+
+test('chrome is never injected into a parked host', async () => {
+  const { serve } = assetSpy();
+  let injected = false;
+  const inject = (response) => {
+    injected = true;
+    return response;
+  };
+  await handleRequest(new Request('https://pathfinder.elevrics.ai/'), serve, inject);
+  assert.equal(injected, false, 'the public placeholder was given the module nav');
+});
+
+test('the router routes identically with no injector supplied', async () => {
+  const { seen, serve } = assetSpy();
+  const res = await handleRequest(new Request('https://portal.elevrics.ai/admin/'), serve);
+  assert.equal(await res.text(), 'ASSET');
+  assert.deepEqual(seen, ['/admin/']);
+});
+
 test('pathfinder keeps its prefix; the others are stripped', () => {
   assert.equal(MODULES['/pathfinder'].stripPrefix, false);
   assert.equal(MODULES['/solayard'].stripPrefix, true);

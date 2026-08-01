@@ -12,29 +12,9 @@
 </head>
 <body>
 
-<nav>
-  <a href="/" class="nav-logo">
-    <svg width="24" height="20" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="n1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9B5CF6"/><stop offset="100%" stop-color="#7B2CBF"/></linearGradient>
-        <linearGradient id="n2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6D8EF8"/><stop offset="100%" stop-color="#3C6FF0"/></linearGradient>
-        <linearGradient id="n3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2EC4BD"/><stop offset="100%" stop-color="#00A19A"/></linearGradient>
-      </defs>
-      <rect x="0" y="11" width="6" height="9" rx="2" fill="url(#n1)"/>
-      <rect x="9" y="5.5" width="6" height="14.5" rx="2" fill="url(#n2)"/>
-      <rect x="18" y="0" width="6" height="20" rx="2" fill="url(#n3)"/>
-    </svg>
-    <span class="nav-logo-text">Elevrics</span>
-    <span class="nav-tag">Portal</span>
-  </a>
-  <ul class="nav-links">
-    <li><a href="/">Home</a></li>
-    <li><a href="/solayard">SolaYard Intel</a></li>
-    <li><a href="/opportunities">Opportunities</a></li>
-    <li><a href="/pathfinder">Pathfinder</a></li>
-    <li><a href="/admin/" aria-current="page">Admin</a></li>
-  </ul>
-</nav>
+<!-- Filled by the Worker from the registry in src/modules.js, which also marks
+     the current page — this file no longer carries its own copy of the links. -->
+<nav data-portal-nav></nav>
 
 <main>
 

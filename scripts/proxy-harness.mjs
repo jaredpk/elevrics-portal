@@ -1,10 +1,15 @@
 /**
- * Integration harness: runs the REAL portal router (functions/[[path]].js)
- * in front of the REAL local app origins, so the prefix-strip + rewrite design
- * is exercised end to end rather than unit-tested in isolation.
+ * Integration harness: runs the REAL portal router (src/router.js) in front of
+ * the REAL local app origins, so the prefix-strip + rewrite design is exercised
+ * end to end rather than unit-tested in isolation.
+ *
+ * No chrome injector is passed — HTMLRewriter is a Workers global with no Node
+ * equivalent. Routing behaves identically without it; only the nav markup is
+ * absent, and that is tested directly in tests/nav.test.mjs.
  */
 import http from 'node:http';
-import { handleRequest, MODULES } from '../src/router.js';
+import { handleRequest } from '../src/router.js';
+import { MODULES } from '../src/modules.js';
 
 // Point the module origins at the locally running apps.
 MODULES['/solayard'].origin = 'http://127.0.0.1:8077';

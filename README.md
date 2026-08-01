@@ -21,7 +21,9 @@ onto a path:
 | `/opportunities` | `elevrics-opportunities.fly.dev` | `jaredpk/elevrics-opportunities` |
 | `/pathfinder` | `elevrics-relocation.fly.dev` | `jaredpk/elevrics-relocation` |
 
-Routing lives in `src/router.js`; `src/index.js` is the Worker entrypoint. The
+`src/modules.js` is the registry — the single source of truth for what the
+portal contains. `src/router.js` proxies from it, `src/nav.js` renders the nav
+and launcher grid from it, and `src/index.js` is the Worker entrypoint. The
 Worker runs on **every** request (`assets.run_worker_first`) and hands anything
 that isn't a module route back to `ASSETS`, so 404s come from the same place as
 the rest of the shell.
@@ -37,6 +39,29 @@ the rest of the shell.
 > folded Pages into Workers, and "Connect to Git" now creates a Worker. The
 > Pages Functions convention (a `functions/` directory) is silently ignored
 > here — a repo laid out that way deploys fine and then routes nothing.
+
+### The registry
+
+Adding a module is an entry in `src/modules.js` — its origin, whether the prefix
+is stripped, and the presentation fields (label, blurb, stack line) that the nav
+and the launcher card need. Nothing else has to change.
+
+Entries with an `origin` are proxied. Entries without one (`/`, `/admin`) are
+portal-owned pages served from `public/`; they still appear in the nav, but
+`matchModule()` skips them so they fall through to `ASSETS`. That check is why
+`/` — a prefix of every path — can safely live in the registry.
+
+Both static pages carry `<nav data-portal-nav>` and (on the launcher)
+`<div class="card-grid" data-portal-cards>` placeholders, which the Worker fills
+via `HTMLRewriter` on the way out. There is no build step to template with, and
+the nav was previously hand-copied into each page — two copies already, and one
+more per page added. `HTMLRewriter` is a Workers global with no Node equivalent,
+so the injector is passed into `handleRequest()` the same way the asset fallback
+is: the unit tests and the local harness pass none and route identically, and
+the markup itself is tested directly against `src/nav.js`.
+
+Parked hosts are never injected. Their placeholder is public, and it must not
+advertise the internal module list.
 
 ### Two proxying modes
 
@@ -87,7 +112,13 @@ npm test             # router unit tests — no network, no wrangler
 npx wrangler dev
 ```
 
-`npm test` (in `tests/`) covers prefix matching, redirect rewriting and cookie scoping.
+`npm test` (in `tests/`) covers prefix matching, redirect rewriting, cookie
+scoping, and that the nav and launcher stay derived from the registry.
+
+The injection itself needs the Workers runtime, so it is checked under
+`npx wrangler dev` rather than in Node — that `/` and `/admin/` render the nav
+with the right entry marked current, that a parked host gets no nav at all, and
+that non-HTML assets pass through byte-identical.
 
 For an end-to-end check against the real apps, start the three origins locally
 and run the integration harness — it imports the *actual* `onRequest` from
