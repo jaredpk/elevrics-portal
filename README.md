@@ -58,7 +58,7 @@ npm test             # router unit tests — no network, no wrangler
 npx wrangler pages dev .
 ```
 
-`npm test` covers prefix matching, redirect rewriting and cookie scoping.
+`npm test` (in `tests/`) covers prefix matching, redirect rewriting and cookie scoping.
 
 For an end-to-end check against the real apps, start the three origins locally
 and run the integration harness — it imports the *actual* `onRequest` from

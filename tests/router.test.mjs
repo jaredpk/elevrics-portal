@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const router = await import('./[[path]].js');
+const router = await import('../functions/[[path]].js');
 const { matchModule, reprefixLocation, reprefixCookiePath, MODULES } = router;
 
 test('matches a module on its bare prefix', () => {

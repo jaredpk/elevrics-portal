@@ -5,7 +5,7 @@
   "description": "Internal portal shell, path router and admin console for Elevrics",
   "type": "module",
   "scripts": {
-    "test": "node --test functions/router.test.mjs",
+    "test": "node --test tests/router.test.mjs",
     "dev": "wrangler pages dev .",
     "harness": "node scripts/proxy-harness.mjs"
   },
