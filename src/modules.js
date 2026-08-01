@@ -41,6 +41,8 @@ export const MODULES = {
     // Flask registers its 9 routes at root. Strip the prefix inbound; the app
     // emits portal-space URLs itself via its URL_PREFIX env var.
     stripPrefix: true,
+    // Server-rendered Flask, minimal JS — the safest origin to decorate first.
+    injectChrome: true,
     label: 'SolaYard Intel',
     initials: 'SI',
     accent: 'purple',
@@ -56,6 +58,7 @@ export const MODULES = {
     origin: 'https://elevrics-opportunities.fly.dev',
     // Express router + static assets, same arrangement as above.
     stripPrefix: true,
+    injectChrome: true,
     label: 'Opportunities',
     initials: 'OP',
     accent: 'blue',
@@ -72,6 +75,12 @@ export const MODULES = {
     // Next.js basePath means the app expects to see /pathfinder in the path
     // and generates its own prefixed asset URLs. Pass the path through whole.
     stripPrefix: false,
+    // OFF pending a check against the real app. Next.js App Router hydrates from
+    // <html>, so an extra <body> child is the one place React may object to what
+    // the injector does. Flip this on only after confirming there is no
+    // hydration error in the deployed module — the other two do not carry that
+    // risk, which is exactly why this flag is per module.
+    injectChrome: false,
     label: 'Pathfinder',
     initials: 'PF',
     accent: 'teal',

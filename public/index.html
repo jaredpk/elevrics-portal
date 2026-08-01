@@ -8,13 +8,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- chrome.css first: it owns the token values and the rail, and is the
+     same sheet injected into the proxied modules. portal.css builds on it. -->
+<link rel="stylesheet" href="/css/chrome.css">
 <link rel="stylesheet" href="/css/portal.css">
 </head>
 <body>
 
 <!-- Filled by the Worker from the registry in src/modules.js. Don't hand-write
      nav links here: there are two pages carrying this and they drifted. -->
-<nav class="rail" aria-label="Portal" data-portal-nav></nav>
+<nav class="elv-rail" aria-label="Portal" data-portal-nav></nav>
 
 <header class="hero">
   <div class="hero-inner">

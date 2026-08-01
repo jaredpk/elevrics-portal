@@ -16,7 +16,7 @@
   var root = document.documentElement;
 
   function pinned() {
-    return root.classList.contains('rail-pinned');
+    return root.classList.contains('elv-rail-pinned');
   }
 
   function sync(button) {
@@ -33,7 +33,7 @@
     sync(button);
 
     button.addEventListener('click', function () {
-      root.classList.toggle('rail-pinned');
+      root.classList.toggle('elv-rail-pinned');
       try {
         localStorage.setItem(KEY, pinned() ? '1' : '0');
       } catch (e) {

@@ -1,7 +1,13 @@
-/* Elevrics Portal — internal shell.
+/* Elevrics Portal — page styling for the portal's OWN pages.
    ==========================================================================
 
-   Every token below has a ROLE, and the role is the thing to reason about when
+   The rail lives in chrome.css, because it also gets injected into the proxied
+   modules and has to survive in pages we don't own. This file is everything
+   that only ever renders here: the hero band, the launcher grid, the admin
+   shell's lists. It requires chrome.css to be loaded first — that is where the
+   token VALUES live; the aliases below just give them page-side names.
+
+   Every token has a ROLE, and the role is the thing to reason about when
    something new needs a colour. Values stay Elevrics (they mirror
    elevrics-site/css/styles.css); only the discipline is borrowed.
 
@@ -26,64 +32,51 @@
    when adding one, check it against the tiles already there — the collapsed
    rail is 34px of colour and two letters, so two adjacent hues stop being
    wayfinding.
+
+   Known and deliberately deferred (2026-08, decision: keep Elevrics branding
+   as it stands). Both are visual-only; neither affects assistive tech, since
+   tabbing into the rail expands it and exposes the real text labels.
+     · --teal and --accent are the same value, so Pathfinder's identity and the
+       "you are here" state are painted the same colour. Green (Finance) is the
+       nearest neighbour to teal in the set at ΔE 29.4.
+     · White initials clear 4.5:1 only on purple (5.33). gray 3.81, blue 3.69,
+       teal 2.61, green 2.20. Revisit if the tiles ever become the sole label.
    ========================================================================== */
 
 :root {
-  --navy:      #071833;
-  --navy-deep: #050F22;
-
-  --accent:      #00A19A;
-  --accent-wash: rgba(0, 161, 154, 0.10);
-
-  /* Text sitting ON a wash needs its own value. The accent and the muted grey
-     are both fine on white and both fail WCAG AA on their own tint at chip size
-     (2.9:1 and 3.9:1) — these are the darkened versions that pass. */
-  --accent-ink: #00706B;
-  --muted-ink:  #565C6B;
-
-  --paper: #F7F8FB;
-  --white: #FFFFFF;
-  --line:  #D3D7E0;
-  --ink:   #22222A;
-  --muted: #6C7383;
-
-  /* Module identity */
-  --purple: #7B2CBF;
-  --blue:   #3C6FF0;
-  --teal:   #00A19A;
-  --green:  #10B981;
-
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
-
-  /* The rail reserves the collapsed width and widens OVER the content on
-     hover; pinning reflows the page to the open width instead. */
-  --rail-collapsed: 64px;
-  --rail-open: 272px;
-
-  --ease: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Aliases over chrome.css, which owns the values. Page styling reads the
+     short names; the chrome that gets injected elsewhere reads --elv-*. One
+     set of hexes, so the two surfaces cannot drift apart. */
+  --navy:        var(--elv-navy);
+  --navy-deep:   var(--elv-navy-deep);
+  --accent:      var(--elv-accent);
+  --accent-wash: var(--elv-accent-wash);
+  --accent-ink:  var(--elv-accent-ink);
+  --muted-ink:   var(--elv-muted-ink);
+  --paper:       var(--elv-paper);
+  --white:       var(--elv-white);
+  --line:        var(--elv-line);
+  --ink:         var(--elv-ink);
+  --muted:       var(--elv-muted);
+  --font-sans:   var(--elv-font-sans);
+  --font-mono:   var(--elv-font-mono);
+  --ease:        var(--elv-ease);
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  padding-left: var(--rail-collapsed);
   font-family: var(--font-sans);
   background: var(--paper);
   color: var(--ink);
   line-height: 1.6;
-  transition: padding-left var(--ease);
 }
-
-html.rail-pinned body { padding-left: var(--rail-open); }
 
 /* The display tier: a treatment, not a typeface. */
 .display-type,
 .hero h1,
 .hero-eyebrow,
-.rail-label,
-.rail-brand-tag,
 .section-label {
   text-transform: uppercase;
   letter-spacing: 0.09em;
@@ -94,172 +87,6 @@ html.rail-pinned body { padding-left: var(--rail-open); }
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
-}
-
-/* ---------- Rail ----------
-   Collapsed it is an icon strip; hovering — or tabbing into it, which is the
-   half that's easy to forget — widens it over the content. Pinning persists
-   (see public/js/portal.js) and reflows instead of overlaying. */
-
-.rail {
-  position: fixed;
-  inset-block: 0;
-  left: 0;
-  z-index: 100;
-  width: var(--rail-collapsed);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  white-space: nowrap;
-  background: var(--white);
-  border-right: 1px solid var(--line);
-  transition: width var(--ease), box-shadow var(--ease);
-}
-
-.rail:hover,
-.rail:focus-within,
-html.rail-pinned .rail {
-  width: var(--rail-open);
-  box-shadow: 0 8px 40px rgba(7, 24, 51, 0.10);
-}
-
-html.rail-pinned .rail { box-shadow: none; }
-
-.rail-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 65px;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--line);
-  text-decoration: none;
-}
-
-.rail-mark { flex: none; }
-
-.rail-brand-text,
-.rail-label,
-.rail .chip,
-.rail-pin {
-  display: none;
-}
-
-.rail:hover .rail-brand-text,
-.rail:focus-within .rail-brand-text,
-html.rail-pinned .rail-brand-text {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-}
-
-.rail:hover .rail-label,
-.rail:focus-within .rail-label,
-html.rail-pinned .rail-label,
-.rail:hover .chip,
-.rail:focus-within .chip,
-html.rail-pinned .rail .chip {
-  display: inline-block;
-}
-
-.rail:hover .rail-pin,
-.rail:focus-within .rail-pin,
-html.rail-pinned .rail-pin {
-  display: flex;
-}
-
-.rail-brand-name {
-  color: var(--navy);
-  font-weight: 600;
-  font-size: 1.02rem;
-  letter-spacing: -0.01em;
-}
-
-.rail-brand-tag {
-  color: var(--muted);
-  font-size: 0.66rem;
-  padding-left: 9px;
-  border-left: 1px solid var(--line);
-}
-
-.rail-pin {
-  position: absolute;
-  top: 19px;
-  right: 14px;
-  align-items: center;
-  justify-content: center;
-  width: 27px;
-  height: 27px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  transition: background var(--ease), color var(--ease);
-}
-
-.rail-pin:hover { background: var(--paper); color: var(--navy); }
-.rail-pin svg { width: 15px; height: 15px; transform: rotate(180deg); }
-html.rail-pinned .rail-pin svg { transform: none; }
-
-.rail-links {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  list-style: none;
-  margin: 0;
-  padding: 12px 12px 24px;
-}
-
-.rail-link {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 8px;
-  margin-bottom: 2px;
-  border-radius: 9px;
-  border-left: 2px solid transparent;
-  text-decoration: none;
-  transition: background var(--ease);
-}
-
-.rail-link:hover { background: rgba(7, 24, 51, 0.04); }
-
-.rail-link[aria-current='page'] {
-  background: var(--accent-wash);
-  border-left-color: var(--accent);
-}
-
-/* The collapsed rail's only wayfinding — same initials and accent as the
-   module's launcher card, so the two agree. */
-.rail-tile {
-  flex: none;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--white);
-}
-
-.rail-tile-home {
-  background: rgba(7, 24, 51, 0.06);
-  color: var(--navy);
-}
-
-.rail-tile-home svg { width: 17px; height: 17px; }
-
-.rail-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 0.82rem;
-  color: var(--navy);
 }
 
 /* ---------- Hero band ----------
@@ -295,7 +122,7 @@ html.rail-pinned .rail-pin svg { transform: none; }
   letter-spacing: 0.03em;
 }
 
-.hero h1 .chip { vertical-align: middle; margin-left: 12px; }
+.hero h1 .elv-chip { vertical-align: middle; margin-left: 12px; }
 
 .hero-sub {
   margin: 14px 0 0;
@@ -321,25 +148,10 @@ main {
 
 .section + .section { margin-top: 48px; }
 
-/* ---------- Chips ----------
-   Only a NON-live status gets one. The point of a chip is that something is not
-   yet what it looks like; chipping everything just adds noise. */
-
-.chip {
-  display: inline-block;
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 0.62rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  line-height: 1.5;
+.hero .elv-chip-shell {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.75);
 }
-
-.chip-shell { background: rgba(108, 115, 131, 0.16); color: var(--muted-ink); }
-.chip-soon,
-.chip-beta { background: var(--accent-wash); color: var(--accent-ink); }
-.hero .chip-shell { background: rgba(255, 255, 255, 0.14); color: rgba(255, 255, 255, 0.75); }
 
 /* ---------- Module cards ---------- */
 
@@ -386,12 +198,6 @@ a.card:hover {
   color: var(--white);
 }
 
-.icon-purple { background: linear-gradient(180deg, #9B5CF6, var(--purple)); }
-.icon-blue   { background: linear-gradient(180deg, #6D8EF8, var(--blue)); }
-.icon-teal   { background: linear-gradient(180deg, #2EC4BD, var(--teal)); }
-.icon-gray   { background: linear-gradient(180deg, #8B93A3, var(--muted)); }
-.icon-green  { background: linear-gradient(180deg, #34D399, var(--green)); }
-
 .card h2 {
   margin: 0 0 6px;
   font-size: 1.15rem;
@@ -415,33 +221,8 @@ a.card:hover {
   color: var(--muted);
 }
 
-/* ---------- Leaving the portal ----------
-   Finance is linked, not proxied, and it has its own sign-in — so a click that
-   leaves the origin should look different from one that doesn't. The arrow is
-   decorative (aria-hidden in the markup); the announcement rides on .sr-only. */
-
-.ext-mark {
-  margin-left: 5px;
-  font-size: 0.82em;
-  font-weight: 500;
-  color: var(--muted);
-  vertical-align: baseline;
-}
-
-.card-external h2 .ext-mark { font-size: 0.72em; }
-
-/* Available to assistive tech, invisible on screen. */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
+/* The launcher card wears the external mark smaller than the rail does. */
+.card-external h2 .elv-ext-mark { font-size: 0.72em; }
 
 /* ---------- Empty / placeholder states ---------- */
 
@@ -518,63 +299,6 @@ footer {
    and one tap away. Nothing hides behind a menu at four modules. */
 
 @media (max-width: 860px) {
-  body { padding-left: 0; }
-  html.rail-pinned body { padding-left: 0; }
-
-  .rail,
-  .rail:hover,
-  .rail:focus-within,
-  html.rail-pinned .rail {
-    position: static;
-    width: auto;
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    overflow-x: auto;
-    padding: 10px 14px;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-    box-shadow: none;
-  }
-
-  .rail-brand {
-    min-height: 0;
-    padding: 0 10px 0 0;
-    border-bottom: 0;
-    border-right: 1px solid var(--line);
-    align-self: stretch;
-  }
-
-  .rail-brand-text { display: none !important; }
-  .rail-pin { display: none !important; }
-
-  .rail-links {
-    display: flex;
-    gap: 8px;
-    flex: 1;
-    padding: 0;
-    overflow: visible;
-  }
-
-  .rail-label { display: inline-block; }
-
-  .rail-link {
-    gap: 8px;
-    padding: 5px 12px 5px 6px;
-    margin: 0;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-  }
-
-  .rail-link[aria-current='page'] {
-    border-color: var(--accent);
-    background: var(--accent-wash);
-  }
-
-  .rail-tile { width: 24px; height: 24px; border-radius: 6px; font-size: 0.66rem; }
-  .rail-tile-home svg { width: 13px; height: 13px; }
-  .rail .chip { display: none !important; }
-
   .hero { padding: 34px 20px 30px; }
   .hero h1 { font-size: 1.85rem; }
   main { padding: 32px 20px 56px; }
@@ -584,11 +308,5 @@ footer {
 /* Respect a stated preference for less movement — the rail's width animation
    is the main offender, and it is decorative. */
 @media (prefers-reduced-motion: reduce) {
-  body,
-  .rail,
-  .rail-link,
-  .rail-pin,
-  .card {
-    transition: none;
-  }
+  .card { transition: none; }
 }

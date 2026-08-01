@@ -32,7 +32,7 @@ function esc(value) {
  * injected into pages we don't own, where a bare `n1` could collide with an
  * existing def and silently repaint someone else's icon.
  */
-const LOGO = `<svg class="rail-mark" width="24" height="20" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+const LOGO = `<svg class="elv-rail-mark" width="24" height="20" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <defs>
     <linearGradient id="elv-n1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9B5CF6"/><stop offset="100%" stop-color="#7B2CBF"/></linearGradient>
     <linearGradient id="elv-n2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6D8EF8"/><stop offset="100%" stop-color="#3C6FF0"/></linearGradient>
@@ -63,14 +63,14 @@ const PIN_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
  */
 const EXTERNAL_ATTRS = ' target="_blank" rel="noopener"';
 const EXTERNAL_MARK =
-  '<span class="ext-mark" aria-hidden="true">\u2197</span>' +
-  '<span class="sr-only"> (opens in a new tab)</span>';
+  '<span class="elv-ext-mark" aria-hidden="true">\u2197</span>' +
+  '<span class="elv-sr-only"> (opens in a new tab)</span>';
 
 /** A status chip, or nothing at all when the thing is simply live. */
 function chip(status) {
   if (!status || status === 'live') return '';
   const label = { shell: 'Shell', soon: 'Soon', beta: 'Beta' }[status] ?? status;
-  return `<span class="chip chip-${esc(status)}">${esc(label)}</span>`;
+  return `<span class="elv-chip elv-chip-${esc(status)}">${esc(label)}</span>`;
 }
 
 /**
@@ -88,30 +88,30 @@ export function renderRail(pathname) {
       const current = isCurrent(prefix, pathname);
       const marker =
         prefix === '/'
-          ? `<span class="rail-tile rail-tile-home">${HOME_GLYPH}</span>`
-          : `<span class="rail-tile icon-${esc(entry.accent)}">${esc(entry.initials)}</span>`;
+          ? `<span class="elv-rail-tile elv-rail-tile-home">${HOME_GLYPH}</span>`
+          : `<span class="elv-rail-tile elv-icon-${esc(entry.accent)}">${esc(entry.initials)}</span>`;
       const external = entry.external ? EXTERNAL_ATTRS : '';
       return `<li>
-        <a class="rail-link" href="${esc(hrefFor(prefix))}"${current ? ' aria-current="page"' : ''}${external}>
+        <a class="elv-rail-link" href="${esc(hrefFor(prefix))}"${current ? ' aria-current="page"' : ''}${external}>
           ${marker}
-          <span class="rail-label">${esc(entry.label)}${entry.external ? EXTERNAL_MARK : ''}</span>
+          <span class="elv-rail-label">${esc(entry.label)}${entry.external ? EXTERNAL_MARK : ''}</span>
           ${chip(entry.status)}
         </a>
       </li>`;
     })
     .join('\n      ');
 
-  return `<a class="rail-brand" href="/">
+  return `<a class="elv-rail-brand" href="/">
     ${LOGO}
-    <span class="rail-brand-text">
-      <span class="rail-brand-name">Elevrics</span>
-      <span class="rail-brand-tag">Portal</span>
+    <span class="elv-rail-brand-text">
+      <span class="elv-rail-brand-name">Elevrics</span>
+      <span class="elv-rail-brand-tag">Portal</span>
     </span>
   </a>
-  <button type="button" class="rail-pin" data-rail-pin aria-pressed="false" aria-label="Keep sidebar open">
+  <button type="button" class="elv-rail-pin" data-rail-pin aria-pressed="false" aria-label="Keep sidebar open">
     ${PIN_GLYPH}
   </button>
-  <ul class="rail-links">
+  <ul class="elv-rail-links">
       ${links}
   </ul>`;
 }
@@ -128,7 +128,7 @@ export function renderCards(group = 'Modules') {
       const external = entry.external ? EXTERNAL_ATTRS : '';
       return `<a class="card${entry.external ? ' card-external' : ''}" href="${esc(hrefFor(prefix))}"${external}>
         <div class="card-head">
-          <div class="card-icon icon-${esc(entry.accent)}">${esc(entry.initials)}</div>
+          <div class="card-icon elv-icon-${esc(entry.accent)}">${esc(entry.initials)}</div>
           ${chip(entry.status)}
         </div>
         <h2>${esc(entry.label)}${entry.external ? EXTERNAL_MARK : ''}</h2>

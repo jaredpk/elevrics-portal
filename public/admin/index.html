@@ -8,19 +8,22 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- chrome.css first: it owns the token values and the rail, and is the
+     same sheet injected into the proxied modules. portal.css builds on it. -->
+<link rel="stylesheet" href="/css/chrome.css">
 <link rel="stylesheet" href="/css/portal.css">
 </head>
 <body>
 
 <!-- Filled by the Worker from the registry in src/modules.js, which also marks
      the current page — this file no longer carries its own copy of the links. -->
-<nav class="rail" aria-label="Portal" data-portal-nav></nav>
+<nav class="elv-rail" aria-label="Portal" data-portal-nav></nav>
 
 <header class="hero">
   <div class="hero-inner">
     <p class="hero-eyebrow">Elevrics Internal</p>
     <div class="hero-rule"></div>
-    <h1>Admin <span class="chip chip-shell">Shell</span></h1>
+    <h1>Admin <span class="elv-chip elv-chip-shell">Shell</span></h1>
     <p class="hero-sub">Cross-tenant console for the client portal. This page is
        a skeleton — it is not wired to any data source, and no clients are
        provisioned. It exists so the client tier has somewhere to land when the

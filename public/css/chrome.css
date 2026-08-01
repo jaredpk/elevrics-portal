@@ -1,0 +1,479 @@
+/* Elevrics portal chrome — the rail, and only the rail.
+   ==========================================================================
+
+   This stylesheet is INJECTED INTO PAGES WE DO NOT OWN (the proxied Flask,
+   Express and Next.js modules). Everything here obeys three rules:
+
+   1. Every selector is class-based and `elv-` prefixed. No bare element
+      selectors, no `*`, nothing that can reach a module's own markup. A class
+      also outranks any element selector no matter how deep, so a module's
+      `nav ul li a { color: red }` cannot repaint our links.
+   2. The rail is position-FIXED at every breakpoint, so it does not matter
+      where in the DOM it was injected. On a portal page it sits in a
+      placeholder near the top of <body>; on a proxied page it is appended at
+      the end. Neither is allowed to change how it looks.
+   3. Only ONE rule reaches outside the rail — the body inset that stops the
+      fixed rail covering content — and it is scoped to `html.elv-chrome`, the
+      class the Worker adds only to pages it actually injected.
+
+   Page-level styling for the portal's OWN pages lives in portal.css, which
+   also aliases the tokens below. This file is the base; that one builds on it.
+   ========================================================================== */
+
+:root {
+  --elv-navy:      #071833;
+  --elv-navy-deep: #050F22;
+
+  --elv-accent:      #00A19A;
+  --elv-accent-wash: rgba(0, 161, 154, 0.10);
+  --elv-accent-ink:  #00706B;
+  --elv-muted-ink:   #565C6B;
+
+  --elv-paper: #F7F8FB;
+  --elv-white: #FFFFFF;
+  --elv-line:  #D3D7E0;
+  --elv-ink:   #22222A;
+  --elv-muted: #6C7383;
+
+  --elv-purple: #7B2CBF;
+  --elv-blue:   #3C6FF0;
+  --elv-teal:   #00A19A;
+  --elv-green:  #10B981;
+
+  --elv-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --elv-font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --elv-rail-collapsed: 64px;
+  --elv-rail-open: 272px;
+  --elv-rail-mobile: 52px;
+
+  --elv-ease: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* The only rule that touches the host page. `elv-chrome` is set by the Worker
+   on <html>, server-side rather than from script, so the inset is right even
+   with JavaScript disabled. */
+html.elv-chrome body { padding-left: var(--elv-rail-collapsed); }
+html.elv-chrome.elv-rail-pinned body { padding-left: var(--elv-rail-open); }
+
+/* ---------- Rail ---------- */
+
+.elv-rail {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 99999; /* over a module's own sticky header, which is what 100–1000 is for */
+  width: var(--elv-rail-collapsed);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+  text-align: left;
+  background: var(--elv-white);
+  border-right: 1px solid var(--elv-line);
+  /* Restated rather than inherited: on a proxied page the host's body font is
+     whatever that app uses, and the rail should look the same everywhere. */
+  font-family: var(--elv-font-sans);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: normal;
+  color: var(--elv-ink);
+  transition: width var(--elv-ease), box-shadow var(--elv-ease);
+}
+
+.elv-rail, .elv-rail * { box-sizing: border-box; }
+
+.elv-rail:hover,
+.elv-rail:focus-within,
+html.elv-rail-pinned .elv-rail {
+  width: var(--elv-rail-open);
+  box-shadow: 0 8px 40px rgba(7, 24, 51, 0.10);
+}
+
+html.elv-rail-pinned .elv-rail { box-shadow: none; }
+
+.elv-rail :focus-visible {
+  outline: 2px solid var(--elv-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.elv-rail-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 65px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--elv-line);
+  text-decoration: none;
+  color: inherit;
+}
+
+.elv-rail-mark { flex: none; }
+
+.elv-rail-brand-text,
+.elv-rail-label,
+.elv-rail .elv-chip,
+.elv-rail-pin {
+  display: none;
+}
+
+.elv-rail:hover .elv-rail-brand-text,
+.elv-rail:focus-within .elv-rail-brand-text,
+html.elv-rail-pinned .elv-rail-brand-text {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.elv-rail:hover .elv-rail-label,
+.elv-rail:focus-within .elv-rail-label,
+html.elv-rail-pinned .elv-rail-label,
+.elv-rail:hover .elv-chip,
+.elv-rail:focus-within .elv-chip,
+html.elv-rail-pinned .elv-rail .elv-chip {
+  display: inline-block;
+}
+
+.elv-rail:hover .elv-rail-pin,
+.elv-rail:focus-within .elv-rail-pin,
+html.elv-rail-pinned .elv-rail-pin {
+  display: flex;
+}
+
+.elv-rail-brand-name {
+  color: var(--elv-navy);
+  font-weight: 600;
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
+}
+
+.elv-rail-brand-tag {
+  color: var(--elv-muted);
+  font-size: 0.66rem;
+  padding-left: 9px;
+  border-left: 1px solid var(--elv-line);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-weight: 600;
+}
+
+.elv-rail-pin {
+  position: absolute;
+  top: 19px;
+  right: 14px;
+  align-items: center;
+  justify-content: center;
+  width: 27px;
+  height: 27px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--elv-muted);
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--elv-ease), color var(--elv-ease);
+}
+
+.elv-rail-pin:hover { background: var(--elv-paper); color: var(--elv-navy); }
+.elv-rail-pin svg { width: 15px; height: 15px; transform: rotate(180deg); display: block; }
+html.elv-rail-pinned .elv-rail-pin svg { transform: none; }
+
+.elv-rail-links {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  list-style: none;
+  margin: 0;
+  padding: 12px 12px 24px;
+}
+
+.elv-rail-links li { list-style: none; margin: 0; padding: 0; }
+
+.elv-rail-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  margin-bottom: 2px;
+  border-radius: 9px;
+  border-left: 2px solid transparent;
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--elv-ease);
+}
+
+.elv-rail-link:hover { background: rgba(7, 24, 51, 0.04); }
+
+.elv-rail-link[aria-current='page'] {
+  background: var(--elv-accent-wash);
+  border-left-color: var(--elv-accent);
+}
+
+/* The collapsed rail's only wayfinding — same initials and accent as the
+   module's launcher card, so the two agree. */
+.elv-rail-tile {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--elv-white);
+}
+
+.elv-rail-tile-home {
+  background: rgba(7, 24, 51, 0.06);
+  color: var(--elv-navy);
+}
+
+.elv-rail-tile-home svg { width: 17px; height: 17px; }
+
+.elv-rail-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.82rem;
+  color: var(--elv-navy);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-weight: 600;
+}
+
+/* ---------- Module identity ----------
+   Shared with the launcher cards, which is the point: one colour per module,
+   wherever it appears. */
+
+.elv-icon-purple { background: linear-gradient(180deg, #9B5CF6, var(--elv-purple)); }
+.elv-icon-blue   { background: linear-gradient(180deg, #6D8EF8, var(--elv-blue)); }
+.elv-icon-teal   { background: linear-gradient(180deg, #2EC4BD, var(--elv-teal)); }
+.elv-icon-green  { background: linear-gradient(180deg, #34D399, var(--elv-green)); }
+.elv-icon-gray   { background: linear-gradient(180deg, #8B93A3, var(--elv-muted)); }
+
+/* ---------- Chips ----------
+   Only a NON-live status gets one. The point of a chip is that something is not
+   yet what it looks like; chipping everything just adds noise. */
+
+.elv-chip {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+}
+
+.elv-chip-shell { background: rgba(108, 115, 131, 0.16); color: var(--elv-muted-ink); }
+.elv-chip-soon,
+.elv-chip-beta { background: var(--elv-accent-wash); color: var(--elv-accent-ink); }
+
+/* ---------- Leaving the portal ---------- */
+
+.elv-ext-mark {
+  margin-left: 5px;
+  font-size: 0.82em;
+  font-weight: 500;
+  color: var(--elv-muted);
+  vertical-align: baseline;
+}
+
+/* Available to assistive tech, invisible on screen. */
+.elv-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Armour ----------
+   Everything above is class-based, which already outranks any element selector
+   a host page might carry: a class beats `nav ul li a` no matter how long the
+   chain. What it does NOT beat is a host's `!important` — and `nav a { color:
+   red !important }` is an ordinary thing to find in a real stylesheet, while
+   our rail IS a <nav> full of <a>. Measured against a hostile stand-in origin,
+   that one rule repainted every rail link red at 30px.
+
+   Between two important declarations of the same origin, specificity decides
+   again — so a class-based important rule wins the argument back. Applied only
+   to the properties a host is likely to set on generic elements (colour, type,
+   list and box resets). Layout internals — flex, gap, tile sizes — stay normal,
+   because nothing targets those generically and `!important` should be the
+   smallest possible surface. */
+
+.elv-rail {
+  margin: 0 !important;
+  text-align: left !important;
+  font-family: var(--elv-font-sans) !important;
+  font-size: 16px !important;
+  line-height: 1.6 !important;
+  color: var(--elv-ink) !important;
+  background: var(--elv-white) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.elv-rail, .elv-rail * { box-sizing: border-box !important; float: none !important; }
+
+.elv-rail a {
+  color: inherit !important;
+  text-decoration: none !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  font-family: inherit !important;
+  letter-spacing: normal !important;
+}
+
+.elv-rail ul, .elv-rail li {
+  list-style: none !important;
+  margin: 0 !important;
+}
+
+.elv-rail li { padding: 0 !important; }
+
+.elv-rail button {
+  font: inherit !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--elv-muted) !important;
+}
+
+.elv-rail svg { max-width: none !important; vertical-align: middle !important; }
+
+.elv-rail-label {
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.09em !important;
+  text-transform: uppercase !important;
+  color: var(--elv-navy) !important;
+}
+
+.elv-rail-brand-name { font-size: 1.02rem !important; font-weight: 600 !important; color: var(--elv-navy) !important; }
+.elv-rail-brand-tag  { font-size: 0.66rem !important; font-weight: 600 !important; color: var(--elv-muted) !important; }
+.elv-rail-tile       { font-size: 0.82rem !important; font-weight: 600 !important; color: var(--elv-white) !important; }
+.elv-rail-tile-home  { color: var(--elv-navy) !important; }
+
+.elv-rail .elv-chip {
+  font-size: 0.62rem !important;
+  font-weight: 700 !important;
+  padding: 3px 9px !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+}
+
+.elv-rail .elv-chip-shell { background: rgba(108, 115, 131, 0.16) !important; color: var(--elv-muted-ink) !important; }
+.elv-rail .elv-chip-soon,
+.elv-rail .elv-chip-beta  { background: var(--elv-accent-wash) !important; color: var(--elv-accent-ink) !important; }
+
+.elv-rail .elv-ext-mark { color: var(--elv-muted) !important; font-size: 0.82em !important; }
+
+/* A host resetting .sr-only would expose our screen-reader text as visible
+   junk in the rail. Ours is `elv-` prefixed, but armour it anyway — it is the
+   one class whose whole job is to stay invisible. */
+.elv-rail .elv-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+}
+
+.elv-rail-links { padding: 12px 12px 24px !important; }
+
+/* ---------- Mobile ----------
+   A horizontal pill scroller pinned to the top, not a hamburger: every
+   destination stays visible and one tap away. Fixed rather than static so it
+   lands at the top of the viewport regardless of where it was injected. */
+
+@media (max-width: 860px) {
+  html.elv-chrome body,
+  html.elv-chrome.elv-rail-pinned body {
+    padding-left: 0;
+    padding-top: var(--elv-rail-mobile);
+  }
+
+  .elv-rail,
+  .elv-rail:hover,
+  .elv-rail:focus-within,
+  html.elv-rail-pinned .elv-rail {
+    top: 0;
+    right: 0;
+    bottom: auto;
+    width: auto;
+    height: var(--elv-rail-mobile);
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 14px !important;
+    border-right: 0;
+    border-bottom: 1px solid var(--elv-line);
+    box-shadow: none;
+  }
+
+  .elv-rail-brand {
+    min-height: 0;
+    padding: 0 10px 0 0;
+    border-bottom: 0;
+    border-right: 1px solid var(--elv-line);
+    align-self: stretch;
+  }
+
+  .elv-rail-brand-text,
+  .elv-rail-pin { display: none !important; }
+
+  .elv-rail-links {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+    padding: 0 !important;
+    overflow: visible;
+  }
+
+  .elv-rail-label { display: inline-block; }
+
+  .elv-rail-link {
+    gap: 8px;
+    padding: 5px 12px 5px 6px;
+    margin: 0;
+    border: 1px solid var(--elv-line);
+    border-radius: 999px;
+  }
+
+  .elv-rail-link[aria-current='page'] {
+    border-color: var(--elv-accent);
+    background: var(--elv-accent-wash);
+  }
+
+  .elv-rail-tile { width: 24px; height: 24px; border-radius: 6px; font-size: 0.66rem; }
+  .elv-rail-tile-home svg { width: 13px; height: 13px; }
+  .elv-rail .elv-chip { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.elv-chrome body,
+  .elv-rail,
+  .elv-rail-link,
+  .elv-rail-pin {
+    transition: none;
+  }
+}

@@ -63,33 +63,77 @@ reading it as "where it lives" rather than "proxy this". Both halves are
 asserted in `tests/`, because getting it wrong breaks Plaid webhooks silently
 (see below).
 
-Both static pages carry `<nav data-portal-nav>` and (on the launcher)
-`<div class="card-grid" data-portal-cards>` placeholders, which the Worker fills
-via `HTMLRewriter` on the way out. It also appends two things to `<head>`: an
-inline snippet that restores the pinned rail before first paint, and a deferred
-`/js/portal.js` for the pin toggle. There is no build step to template with, and
-the nav was previously hand-copied into each page — two copies already, and one
-more per page added. `HTMLRewriter` is a Workers global with no Node equivalent,
-so the injector is passed into `handleRequest()` the same way the asset fallback
-is: the unit tests and the local harness pass none and route identically, and
-the markup itself is tested directly against `src/nav.js`.
+### Chrome injection
+
+The rail is rendered by the Worker and stapled into pages with `HTMLRewriter`,
+in two modes:
+
+- **Portal-owned pages** carry `<nav data-portal-nav>` and (on the launcher)
+  `<div class="card-grid" data-portal-cards>` placeholders to fill.
+- **Proxied modules** have neither, so the rail is *appended* to `<body>` and
+  `chrome.css` linked into `<head>`. Appended rather than prepended: it is the
+  least invasive place to put a node in someone else's document, and the rail is
+  position-fixed at every breakpoint precisely so its DOM position never
+  matters.
+
+Both modes also get an inline `<head>` snippet that restores the pinned rail
+before first paint, a deferred `/js/portal.js` for the toggle, and an
+`elv-chrome` class on `<html>` — set server-side, so the body inset that clears
+the fixed rail is right even with JavaScript off.
+
+Two guards matter:
+
+- **Per-module opt-in.** `injectChrome` in the registry, so origins are
+  decorated one at a time and undone by deleting a word. Pathfinder is
+  deliberately **off**: Next.js App Router hydrates from `<html>`, so an extra
+  `<body>` child is the one place React may object. Turn it on only after
+  confirming the deployed app logs no hydration error.
+- **Documents only.** A Flask or Express app may answer XHR with `text/html`
+  partials, and a navigation rail spliced into a table fragment would be a mess.
+  `Sec-Fetch-Dest: document` decides, falling back to `Accept` where the header
+  is absent, and declining when neither says so. Failing closed costs a rail;
+  failing open corrupts a page.
+
+`HTMLRewriter` is a Workers global with no Node equivalent, so the injector is
+passed into `handleRequest()` the same way the asset fallback is: the unit tests
+and the local harness pass none and route identically, and the markup itself is
+tested directly against `src/nav.js`.
 
 Parked hosts are never injected. Their placeholder is public, and it must not
 advertise the internal module list.
 
 ### Chrome and design tokens
 
-`public/css/portal.css` opens with the token table — every token has a ROLE, and
-the role is the thing to reason about when something new needs a colour. Values
-stay Elevrics; only the discipline is borrowed from the insights-portal concept
-(see `docs/portal-redesign-plan.md`).
+Two stylesheets, split by where they have to survive:
+
+- **`chrome.css`** — the rail, the chips, the module identity colours, and the
+  token VALUES. This is the sheet that gets injected into pages we don't own,
+  so every selector is class-based and `elv-` prefixed, and exactly one rule
+  (`html.elv-chrome body`) reaches outside the rail.
+- **`portal.css`** — everything that only ever renders on the portal's own
+  pages: hero band, launcher grid, admin lists. It aliases chrome.css's tokens
+  to short names, so the hexes have one home and the two surfaces can't drift.
+
+A class already outranks any element selector a host page carries, however deep.
+It does **not** outrank a host's `!important` — and `nav a { color: red
+!important }` is ordinary in real stylesheets, while our rail *is* a `<nav>` full
+of `<a>`. Measured against a hostile stand-in origin, that single rule repainted
+every rail link red at 30px. Specificity decides again between two important
+declarations, so chrome.css carries an **armour** block: class-based
+`!important` on the properties a host is likely to set generically (colour,
+type, list and box resets). Layout internals stay normal — `!important` should
+have the smallest surface that works.
+
+Every token has a ROLE, and the role is the thing to reason about when something
+new needs a colour. Values stay Elevrics; only the discipline is borrowed from
+the insights-portal concept (see `docs/portal-redesign-plan.md`).
 
 Two conventions are load-bearing:
 
 - **Module accents are identity, not palette.** Each module's initials tile
   carries the same colour in the rail and on its launcher card, because the
   collapsed rail has nothing else to identify a destination by. Don't reuse
-  purple/blue/teal/gray to mean anything.
+  purple/blue/teal/green/gray to mean anything.
 - **Text on a wash gets its own token.** `--accent` and `--muted` both pass
   contrast on white and both fail on their own 10–16% tint at chip size (2.9:1
   and 3.9:1). `--accent-ink` / `--muted-ink` are the darkened values that pass;
@@ -98,8 +142,10 @@ Two conventions are load-bearing:
 The rail auto-collapses to an icon strip and expands on hover **or focus** —
 the focus half is what keeps it usable from the keyboard. Pinning keeps it open
 and reflows the page instead of overlaying, and persists to `localStorage`.
-Below 860px it becomes a horizontal pill scroller rather than a hamburger:
-nothing hides behind a menu at four modules.
+Below 860px it becomes a horizontal pill scroller pinned to the top rather than
+a hamburger: nothing hides behind a menu at five entries, and pinning it means
+the bar lands correctly whether the rail was injected at the start of a page or
+appended to the end of one.
 
 ### Two proxying modes
 
@@ -175,9 +221,18 @@ npx wrangler dev
 scoping, and that the nav and launcher stay derived from the registry.
 
 The injection itself needs the Workers runtime, so it is checked under
-`npx wrangler dev` rather than in Node — that `/` and `/admin/` render the nav
+`npx wrangler dev` rather than in Node: that `/` and `/admin/` render the nav
 with the right entry marked current, that a parked host gets no nav at all, and
 that non-HTML assets pass through byte-identical.
+
+For the proxied side, point the module origins at a local stand-in that styles
+its OWN `.rail`, `.chip` and `.card`, and sets `!important` on `a`, `span`,
+`ul`, `button` and `svg`. Both directions have to hold: the rail keeps its own
+type and colour, and the module's page is left exactly as its author styled it.
+That test is what caught the armour gap — and a browser screenshot is what
+caught the tiles rendering flat, because the class name in the markup and the
+one in the CSS had drifted apart while the unit test still passed on a
+substring.
 
 For an end-to-end check against the real apps, start the three origins locally
 and run the integration harness — it imports the *actual* `onRequest` from

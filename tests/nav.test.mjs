@@ -42,7 +42,7 @@ test('an external link opens away from the portal, and says so', () => {
   }
   // The arrow is decorative — the announcement has to be real text.
   assert.match(rail, /aria-hidden="true">\u2197</);
-  assert.match(rail, /class="sr-only"> \(opens in a new tab\)</);
+  assert.match(rail, /class="elv-sr-only"> \(opens in a new tab\)</);
 });
 
 test('an external destination is never the current page', () => {
@@ -96,7 +96,9 @@ test('every module carries its identity tile into the rail', () => {
     if (prefix === '/') continue;
     // Same initials and accent as the launcher card — the collapsed rail has
     // nothing else to identify a destination by.
-    assert.match(html, new RegExp(`icon-${entry.accent}">${entry.initials}<`), `${prefix} tile`);
+    // Anchored on the prefix: `icon-purple` alone is a substring of
+    // `elv-icon-purple`, so an unprefixed class would have slipped through.
+    assert.match(html, new RegExp(`"elv-rail-tile elv-icon-${entry.accent}">${entry.initials}<`), `${prefix} tile`);
   }
 });
 
@@ -109,11 +111,11 @@ test('the rail is operable without a mouse', () => {
   assert.match(html, /aria-label="/);
 });
 
-test('only a non-live status gets a chip', () => {
+test('only a non-live status gets a elv-chip', () => {
   const html = renderRail('/');
-  assert.match(html, /class="chip chip-shell">Shell</, 'the admin shell went unchipped');
+  assert.match(html, /class="elv-chip elv-chip-shell">Shell</, 'the admin shell went unchipped');
   // Three live modules + Home: nothing else should be chipped.
-  assert.equal([...html.matchAll(/class="chip /g)].length, 1);
+  assert.equal([...html.matchAll(/class="elv-chip /g)].length, 1);
 });
 
 test('the launcher renders a card per grouped module, and none for Home', () => {
@@ -123,7 +125,7 @@ test('the launcher renders a card per grouped module, and none for Home', () => 
   assert.equal([...html.matchAll(/class="card[ "]/g)].length, grouped.length);
   for (const [prefix, entry] of grouped) {
     assert.match(html, new RegExp(`href="${hrefFor(prefix)}"`));
-    assert.match(html, new RegExp(`icon-${entry.accent}`));
+    assert.match(html, new RegExp(`"card-icon elv-icon-${entry.accent}"`));
   }
   assert.doesNotMatch(html, /class="card[ "][^>]*href="\/"/, 'the launcher linked to itself');
 });
@@ -133,8 +135,8 @@ test('a card meta line names the module path and its stack', () => {
 });
 
 test('the card and the rail agree about status', () => {
-  assert.match(renderCards(), /class="chip chip-shell">Shell</);
-  assert.equal([...renderCards().matchAll(/class="chip /g)].length, 1);
+  assert.match(renderCards(), /class="elv-chip elv-chip-shell">Shell</);
+  assert.equal([...renderCards().matchAll(/class="elv-chip /g)].length, 1);
 });
 
 test('markup is escaped, so a stray angle bracket cannot break out', () => {

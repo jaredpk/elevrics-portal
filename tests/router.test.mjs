@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+const { isDocumentRequest } = await import('../src/chrome.js');
 const router = await import('../src/router.js');
 const {
   matchModule,
@@ -138,6 +139,32 @@ test('the router routes identically with no injector supplied', async () => {
   const res = await handleRequest(new Request('https://portal.elevrics.ai/admin/'), serve);
   assert.equal(await res.text(), 'ASSET');
   assert.deepEqual(seen, ['/admin/']);
+});
+
+// ---- Chrome over the proxied modules ----
+
+test('a fragment request is never given a navigation rail', () => {
+  // A Flask or Express app answering XHR with a text/html partial must not get
+  // a whole rail spliced into it.
+  const doc = (h) => new Request('https://portal.elevrics.ai/solayard', { headers: h });
+  assert.equal(isDocumentRequest(doc({ 'Sec-Fetch-Dest': 'document' })), true);
+  assert.equal(isDocumentRequest(doc({ 'Sec-Fetch-Dest': 'empty' })), false);
+  assert.equal(isDocumentRequest(doc({ 'Sec-Fetch-Dest': 'iframe' })), false);
+});
+
+test('with no Sec-Fetch-Dest we fall back to Accept, and fail closed', () => {
+  const req = (h) => new Request('https://portal.elevrics.ai/solayard', { headers: h });
+  assert.equal(isDocumentRequest(req({ Accept: 'text/html,application/xhtml+xml' })), true);
+  assert.equal(isDocumentRequest(req({ Accept: '*/*' })), false, 'an XHR got the rail');
+  assert.equal(isDocumentRequest(req({})), false, 'declined to fail closed');
+});
+
+test('chrome reaches a proxied module only when that module opts in', () => {
+  // Per-module, so one origin can be decorated at a time and undone by
+  // deleting a word. Pathfinder is off pending a Next.js hydration check.
+  assert.equal(MODULES['/solayard'].injectChrome, true);
+  assert.equal(MODULES['/opportunities'].injectChrome, true);
+  assert.equal(MODULES['/pathfinder'].injectChrome, false);
 });
 
 test('pathfinder keeps its prefix; the others are stripped', () => {

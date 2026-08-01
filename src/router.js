@@ -21,6 +21,7 @@
  */
 
 import { MODULES } from './modules.js';
+import { isDocumentRequest } from './chrome.js';
 
 export { MODULES };
 
@@ -128,11 +129,9 @@ export async function handleRequest(request, serveAssets, injectChrome) {
 
   const match = matchModule(url.pathname);
   if (!match) {
-    // The portal's own pages (and its 404s) — chrome goes on here. Proxied
-    // module responses below still pass through bare; giving them the nav too
-    // is the next phase, and wants its own testing.
+    // The portal's own pages (and its 404s): fill the placeholders they carry.
     const response = await serveAssets(request);
-    return injectChrome ? injectChrome(response, url.pathname) : response;
+    return injectChrome ? injectChrome(response, url.pathname, 'placeholder') : response;
   }
 
   const { prefix, config } = match;
@@ -155,7 +154,16 @@ export async function handleRequest(request, serveAssets, injectChrome) {
   // rather than bouncing the browser to the bare fly.dev origin.
   const response = await fetch(proxied, { redirect: 'manual' });
 
-  if (!config.stripPrefix) return response;
+  // Chrome on a proxied module is opt-in PER MODULE, so it can be switched on
+  // one origin at a time and switched off by deleting a word. Only ever on a
+  // top-level page load — see isDocumentRequest for why a fragment must not
+  // receive a navigation rail.
+  const decorate = (res) =>
+    injectChrome && config.injectChrome && isDocumentRequest(request)
+      ? injectChrome(res, url.pathname, 'standalone')
+      : res;
+
+  if (!config.stripPrefix) return decorate(response);
 
   const rewritten = new Response(response.body, response);
 
@@ -172,5 +180,5 @@ export async function handleRequest(request, serveAssets, injectChrome) {
     }
   }
 
-  return rewritten;
+  return decorate(rewritten);
 }
