@@ -20,8 +20,9 @@
  * proxying here, the nav, and the launcher grid.
  */
 
-import { MODULES } from './modules.js';
-import { isDocumentRequest } from './chrome.js';
+import { MODULES, matchComingSoon } from './modules.js';
+import { isDocumentRequest, viewerFor } from './chrome.js';
+import { renderComingSoon } from './nav.js';
 
 export { MODULES };
 
@@ -105,12 +106,15 @@ export function reprefixCookiePath(cookie, prefix) {
 /**
  * @param request  the incoming Request
  * @param serveAssets  fallback for anything that isn't a module route
- * @param injectChrome  optional (response, pathname) => Response that fills the
- *   nav placeholders. Omitted outside the Workers runtime, where HTMLRewriter
- *   doesn't exist; the router routes identically either way.
+ * @param injectChrome  optional (response, {pathname, mode, viewer}) => Response
+ *   that renders the rail into the page. Omitted outside the Workers runtime,
+ *   where HTMLRewriter doesn't exist; the router routes identically either way.
  */
 export async function handleRequest(request, serveAssets, injectChrome) {
   const url = new URL(request.url);
+  // Set by Cloudflare Access on everything it lets through. Display only — it
+  // names the signed-in viewer in the rail and gates nothing.
+  const viewer = viewerFor(request);
 
   // Parked hosts are checked before anything path-based, so no request on a
   // public hostname can reach a module.
@@ -129,9 +133,19 @@ export async function handleRequest(request, serveAssets, injectChrome) {
 
   const match = matchModule(url.pathname);
   if (!match) {
-    // The portal's own pages (and its 404s): fill the placeholders they carry.
-    const response = await serveAssets(request);
-    return injectChrome ? injectChrome(response, url.pathname, 'placeholder') : response;
+    // A module that is listed but not built yet gets a branded page rather
+    // than a 404, so the "Soon" chip in the rail leads somewhere deliberate.
+    const soon = matchComingSoon(url.pathname);
+    const response = soon
+      ? new Response(renderComingSoon(soon.prefix, soon.entry), {
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        })
+      : await serveAssets(request);
+
+    // Either way it is one of the portal's own pages: fill the placeholders.
+    return injectChrome
+      ? injectChrome(response, { pathname: url.pathname, mode: 'placeholder', viewer })
+      : response;
   }
 
   const { prefix, config } = match;
@@ -160,7 +174,7 @@ export async function handleRequest(request, serveAssets, injectChrome) {
   // receive a navigation rail.
   const decorate = (res) =>
     injectChrome && config.injectChrome && isDocumentRequest(request)
-      ? injectChrome(res, url.pathname, 'standalone')
+      ? injectChrome(res, { pathname: url.pathname, mode: 'standalone', viewer })
       : res;
 
   if (!config.stripPrefix) return decorate(response);

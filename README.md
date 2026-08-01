@@ -63,6 +63,15 @@ reading it as "where it lives" rather than "proxy this". Both halves are
 asserted in `tests/`, because getting it wrong breaks Plaid webhooks silently
 (see below).
 
+A fourth axis crosses those: `status`. `live` renders no chip; anything else
+(`shell`, `beta`, `coming_soon`) chips itself in the rail and on its card, so a
+thing that is not yet what it looks like says so everywhere it appears. A
+`coming_soon` entry needs no origin and no files — the router serves it a
+branded page, so a module can be listed the day it is decided rather than the
+day it ships, and the "Soon" chip leads somewhere deliberate instead of to a
+404. Only an exact match: `/demands` and `/demands/` render, `/demands/anything`
+stays a 404 rather than inventing pages nobody published.
+
 ### Chrome injection
 
 The rail is rendered by the Worker and stapled into pages with `HTMLRewriter`,
@@ -207,6 +216,19 @@ that reaches the router is already authenticated, and the
 hostnames stay publicly reachable, so every origin verifies the Access token
 itself — a direct hit on `*.fly.dev` has to be rejected there, not here.
 
+Access also sets `Cf-Access-Authenticated-User-Email` on everything it lets
+through, and the rail now shows it at the foot — on the proxied modules too,
+where the header was already being forwarded and nothing displayed it. It tells
+you *which* identity you are using, which matters as soon as more than one
+policy exists.
+
+**Display only.** It must never gate anything: a header that decided what you
+can see would quietly contradict the paragraph above. It is escaped like every
+other value the rail renders. There is no sign-out control yet —
+`/cdn-cgi/access/logout` is handled at Cloudflare's edge before the Worker
+runs, so it cannot be verified under `wrangler dev`, and shipping UI that only
+a deploy can test seemed the wrong trade.
+
 ---
 
 ## Local development
@@ -232,7 +254,17 @@ type and colour, and the module's page is left exactly as its author styled it.
 That test is what caught the armour gap — and a browser screenshot is what
 caught the tiles rendering flat, because the class name in the markup and the
 one in the CSS had drifted apart while the unit test still passed on a
-substring.
+substring. A screenshot caught the second one too: a `coming_soon` chip
+rendering its raw status, unstyled and wide enough to truncate the label beside
+it. Look at the pages, not only the assertions.
+
+To exercise the identity footer locally, send the header `wrangler dev` has no
+Access in front of it to set:
+
+```bash
+curl -H 'Cf-Access-Authenticated-User-Email: you@elevrics.ai' \
+     -H 'Sec-Fetch-Dest: document' http://127.0.0.1:8788/solayard
+```
 
 For an end-to-end check against the real apps, start the three origins locally
 and run the integration harness — it imports the *actual* `onRequest` from

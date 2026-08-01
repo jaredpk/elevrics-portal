@@ -186,7 +186,7 @@ html.elv-rail-pinned .elv-rail-pin {
 html.elv-rail-pinned .elv-rail-pin svg { transform: none; }
 
 .elv-rail-links {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -249,6 +249,64 @@ html.elv-rail-pinned .elv-rail-pin svg { transform: none; }
   text-transform: uppercase;
   letter-spacing: 0.09em;
   font-weight: 600;
+}
+
+/* ---------- Who is signed in ----------
+   Pinned below the links. Collapsed, the initial alone is the marker; opening
+   the rail reveals the address. Cloudflare Access already knew this on every
+   request — the portal just never showed it. */
+
+.elv-rail-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  padding: 12px 15px;
+  border-top: 1px solid var(--elv-line);
+}
+
+.elv-rail-avatar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--elv-accent-wash);
+  color: var(--elv-accent-ink);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.elv-rail-viewer {
+  display: none;
+  min-width: 0;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.elv-rail:hover .elv-rail-viewer,
+.elv-rail:focus-within .elv-rail-viewer,
+html.elv-rail-pinned .elv-rail-viewer {
+  display: flex;
+}
+
+.elv-rail-viewer-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--elv-muted);
+}
+
+.elv-rail-viewer-email {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--elv-font-mono);
+  font-size: 0.68rem;
+  color: var(--elv-navy);
 }
 
 /* ---------- Module identity ----------
@@ -398,6 +456,15 @@ html.elv-rail-pinned .elv-rail-pin svg { transform: none; }
 
 .elv-rail-links { padding: 12px 12px 24px !important; }
 
+.elv-rail-foot { padding: 12px 15px !important; }
+.elv-rail-avatar { font-size: 0.72rem !important; font-weight: 700 !important; color: var(--elv-accent-ink) !important; }
+.elv-rail-viewer-label { font-size: 0.58rem !important; font-weight: 700 !important; color: var(--elv-muted) !important; }
+.elv-rail-viewer-email {
+  font-family: var(--elv-font-mono) !important;
+  font-size: 0.68rem !important;
+  color: var(--elv-navy) !important;
+}
+
 /* ---------- Mobile ----------
    A horizontal pill scroller pinned to the top, not a hamburger: every
    destination stays visible and one tap away. Fixed rather than static so it
@@ -467,6 +534,9 @@ html.elv-rail-pinned .elv-rail-pin svg { transform: none; }
   .elv-rail-tile { width: 24px; height: 24px; border-radius: 6px; font-size: 0.66rem; }
   .elv-rail-tile-home svg { width: 13px; height: 13px; }
   .elv-rail .elv-chip { display: none !important; }
+
+  /* No room for it in a 52px bar, and the pills are the priority there. */
+  .elv-rail-foot { display: none !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {

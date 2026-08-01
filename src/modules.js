@@ -155,6 +155,21 @@ export function isCurrent(prefix, pathname) {
 }
 
 /**
+ * A registry entry that exists in the portal but has nothing behind it yet.
+ *
+ * Only an EXACT match (bare or with a trailing slash). A coming-soon module has
+ * no sub-pages, so `/foo/anything` must stay a 404 rather than silently
+ * answering 200 for a URL nobody published.
+ */
+export function matchComingSoon(pathname) {
+  for (const [prefix, entry] of Object.entries(MODULES)) {
+    if (entry.status !== 'coming_soon' || !prefix.startsWith('/')) continue;
+    if (pathname === prefix || pathname === `${prefix}/`) return { prefix, entry };
+  }
+  return null;
+}
+
+/**
  * What a card's meta line shows before the stack. A path for anything on the
  * portal; the bare hostname for an external destination, since the scheme is
  * noise and the host is the point.

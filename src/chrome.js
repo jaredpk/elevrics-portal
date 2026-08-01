@@ -26,7 +26,7 @@
  *                   position never matters.
  */
 
-import { renderRail, renderCards } from './nav.js';
+import { renderRail, renderCards, renderComingSoon } from './nav.js';
 
 /**
  * Restores the pinned rail before first paint.
@@ -54,10 +54,13 @@ function isHtml(response) {
  * Build an injector over a runtime's HTMLRewriter.
  *
  * @param HTMLRewriterCtor  the runtime's HTMLRewriter constructor
- * @returns (response, pathname, mode) => Response — non-HTML passes through
+ * @returns (response, context) => Response — non-HTML passes through untouched.
+ *   context: { pathname, mode, viewer } — an object rather than positional
+ *   arguments because `viewer` is the third thing the rail needs to know and a
+ *   three-argument call site stops reading as anything in particular.
  */
 export function makeChromeInjector(HTMLRewriterCtor) {
-  return function injectChrome(response, pathname, mode = 'placeholder') {
+  return function injectChrome(response, { pathname, mode = 'placeholder', viewer = null } = {}) {
     if (!isHtml(response)) return response;
 
     const standalone = mode === 'standalone';
@@ -82,16 +85,17 @@ export function makeChromeInjector(HTMLRewriterCtor) {
     if (standalone) {
       rewriter = rewriter.on('body', {
         element(el) {
-          el.append(`<nav class="elv-rail" aria-label="Portal">${renderRail(pathname)}</nav>`, {
-            html: true,
-          });
+          el.append(
+            `<nav class="elv-rail" aria-label="Portal">${renderRail(pathname, viewer)}</nav>`,
+            { html: true },
+          );
         },
       });
     } else {
       rewriter = rewriter
         .on('[data-portal-nav]', {
           element(el) {
-            el.setInnerContent(renderRail(pathname), { html: true });
+            el.setInnerContent(renderRail(pathname, viewer), { html: true });
           },
         })
         .on('[data-portal-cards]', {
@@ -103,6 +107,17 @@ export function makeChromeInjector(HTMLRewriterCtor) {
 
     return rewriter.transform(response);
   };
+}
+
+/**
+ * The header Cloudflare Access sets on every request it lets through.
+ *
+ * Absent in local dev (`wrangler dev` is not behind Access), which is why the
+ * rail renders no footer at all rather than an empty "Signed in as" — a blank
+ * identity reads as a bug, and an absent one reads as local.
+ */
+export function viewerFor(request) {
+  return request.headers.get('Cf-Access-Authenticated-User-Email');
 }
 
 /**

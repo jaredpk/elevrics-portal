@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { renderRail, renderCards } from '../src/nav.js';
+import { renderRail, renderCards, renderComingSoon } from '../src/nav.js';
 import { MODULES, hrefFor, isCurrent } from '../src/modules.js';
 
 /**
@@ -137,6 +137,86 @@ test('a card meta line names the module path and its stack', () => {
 test('the card and the rail agree about status', () => {
   assert.match(renderCards(), /class="elv-chip elv-chip-shell">Shell</);
   assert.equal([...renderCards().matchAll(/class="elv-chip /g)].length, 1);
+});
+
+// ---- Who is signed in ----
+
+test('the rail names the signed-in viewer', () => {
+  const html = renderRail('/', 'jared@elevrics.ai');
+  assert.match(html, /elv-rail-viewer-email[^>]*>jared@elevrics\.ai</);
+  assert.match(html, /elv-rail-avatar" aria-hidden="true">J</, 'no collapsed marker');
+});
+
+test('no identity means no footer, not an empty one', () => {
+  // Local dev has no Access in front of it. A blank "Signed in as" reads as a
+  // bug; an absent one reads as local.
+  assert.doesNotMatch(renderRail('/', null), /elv-rail-foot/);
+  assert.doesNotMatch(renderRail('/'), /elv-rail-foot/);
+});
+
+test('the identity is escaped like everything else', () => {
+  // Display-only and Access-set, but it is the one value in the rail that does
+  // not come from our own registry.
+  const html = renderRail('/', '<img src=x onerror=alert(1)>@evil.test');
+  assert.doesNotMatch(html, /<img/);
+  assert.match(html, /&lt;img/);
+});
+
+test('a coming-soon module is chipped "Soon", not its raw status', () => {
+  // The status value and the chip wording are separate: `coming_soon` is what
+  // the router matches on, and it is too wide for the rail — rendering it raw
+  // truncated the label next to it and picked up no chip styling at all.
+  MODULES['/demands'] = {
+    label: 'Demands', initials: 'DM', accent: 'blue', group: 'Modules',
+    status: 'coming_soon', stack: 'not built yet', blurb: 'Demand drafting.',
+  };
+  try {
+    for (const html of [renderRail('/'), renderCards()]) {
+      assert.match(html, /class="elv-chip elv-chip-soon">Soon</);
+      assert.doesNotMatch(html, /coming_soon</, 'the raw status reached the chip');
+      assert.doesNotMatch(html, /elv-chip-coming_soon/, 'chip variant has no styles');
+    }
+  } finally {
+    delete MODULES['/demands'];
+  }
+});
+
+test('an unrecognised status still renders, so a typo is visible', () => {
+  MODULES['/typo'] = { label: 'Typo', initials: 'TY', accent: 'gray', status: 'lve' };
+  try {
+    // Neutral variant rather than nothing — a status that silently vanishes is
+    // a status nobody notices is wrong.
+    assert.match(renderRail('/'), /class="elv-chip elv-chip-shell">lve</);
+  } finally {
+    delete MODULES['/typo'];
+  }
+});
+
+// ---- Listed but not built ----
+
+test('an unbuilt module renders a whole branded page', () => {
+  const entry = {
+    label: 'Demands', status: 'coming_soon',
+    blurb: 'Demand drafting throughput and the settlement pipeline.',
+  };
+  const html = renderComingSoon('/demands', entry);
+  assert.match(html, /^<!DOCTYPE html>/);
+  assert.match(html, /<title>Demands · Elevrics Portal<\/title>/);
+  assert.match(html, /elv-chip elv-chip-soon">Soon</);
+  assert.match(html, /Demand drafting throughput/);
+  // Same chrome as every other portal page — it is an empty page, not a
+  // different kind of page.
+  assert.match(html, /data-portal-nav/);
+  assert.match(html, /href="\/css\/chrome.css"/);
+  assert.match(html, /href="\/css\/portal.css"/);
+  // Listed but unbuilt is still internal.
+  assert.match(html, /noindex/);
+});
+
+test('an unbuilt module escapes its own registry copy', () => {
+  const html = renderComingSoon('/x', { label: '<b>X</b>', status: 'coming_soon', blurb: 'a & b' });
+  assert.doesNotMatch(html, /<b>X<\/b>/);
+  assert.match(html, /&lt;b&gt;X/);
 });
 
 test('markup is escaped, so a stray angle bracket cannot break out', () => {

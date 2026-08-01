@@ -1,12 +1,22 @@
 # Portal Redesign — Mirroring the Insights-Portal Concept
 
-> **Status (2026-08).** Phases 0–2 are done. Phase 2 shipped with pathfinder's
-> `injectChrome` flag off, exactly as the fallback below anticipated — the
-> Next.js hydration question needs the real deployed app to answer, and the
-> per-module flag is what makes shipping the other two without it possible.
-> Phase 3 is next. Two palette findings surfaced during Phase 1–2 and were
-> deliberately deferred in favour of keeping Elevrics branding as it stands;
-> the measurements are recorded at the top of `public/css/portal.css`.
+> **Status (2026-08).** Phases 0–3 are done; only Phase 4 remains, and it is
+> still the deferred product bet it was written as.
+>
+> Phase 2 shipped with pathfinder's `injectChrome` flag off, exactly as the
+> fallback below anticipated — the Next.js hydration question needs the real
+> deployed app to answer, and the per-module flag is what makes shipping the
+> other two without it possible.
+>
+> Phase 3 landed the access indicator and the coming-soon machinery, minus a
+> sign-out control: `/cdn-cgi/access/logout` is edge-handled before the Worker
+> runs and cannot be verified locally.
+>
+> Two palette findings surfaced during Phases 1–2 and were deliberately
+> deferred in favour of keeping Elevrics branding as it stands; the
+> measurements are at the top of `public/css/portal.css`. A third — the parked
+> placeholder's dark-mode chip at 2.4:1 — was a real bug on a public page and
+> was fixed rather than deferred.
 
 An assessment of the `lb-insights` concept against this portal, and a staged plan
 for adopting it. Written 2026-08-01 against concept snapshot `lb-insights-dev-main`.

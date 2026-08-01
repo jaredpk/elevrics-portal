@@ -66,11 +66,53 @@ const EXTERNAL_MARK =
   '<span class="elv-ext-mark" aria-hidden="true">\u2197</span>' +
   '<span class="elv-sr-only"> (opens in a new tab)</span>';
 
+/**
+ * Who is signed in, at the foot of the rail.
+ *
+ * Cloudflare Access puts the verified identity on every request that reaches
+ * the Worker, so the portal can finally SHOW its auth story instead of
+ * asserting it in prose — including on the proxied modules, where the header
+ * was already being forwarded and nothing displayed it.
+ *
+ * Display only. This must never gate anything: the README is emphatic that the
+ * router is a convenience layer and each origin verifies the token itself, and
+ * a header that decides what you can see would quietly contradict that.
+ * Rendered through esc() like everything else, so a spoofed value on some
+ * hypothetical un-gated path can only mislead the person who sent it.
+ */
+function viewerFoot(viewer) {
+  if (!viewer) return '';
+  const initial = viewer.trim().charAt(0).toUpperCase() || '?';
+  return `<div class="elv-rail-foot">
+    <span class="elv-rail-avatar" aria-hidden="true">${esc(initial)}</span>
+    <span class="elv-rail-viewer">
+      <span class="elv-rail-viewer-label">Signed in</span>
+      <span class="elv-rail-viewer-email" title="${esc(viewer)}">${esc(viewer)}</span>
+    </span>
+  </div>`;
+}
+
+/**
+ * How each registry status appears as a chip.
+ *
+ * The status VALUE and the chip's wording are separate on purpose: `coming_soon`
+ * is what the router matches on, "Soon" is what fits in a 272px rail. Rendering
+ * the raw status is what shipped first, and `COMING_SOON` was both unstyled and
+ * wide enough to truncate the label beside it.
+ */
+const STATUS_CHIP = {
+  shell: { label: 'Shell', variant: 'shell' },
+  coming_soon: { label: 'Soon', variant: 'soon' },
+  beta: { label: 'Beta', variant: 'beta' },
+};
+
 /** A status chip, or nothing at all when the thing is simply live. */
 function chip(status) {
   if (!status || status === 'live') return '';
-  const label = { shell: 'Shell', soon: 'Soon', beta: 'Beta' }[status] ?? status;
-  return `<span class="elv-chip elv-chip-${esc(status)}">${esc(label)}</span>`;
+  // An unrecognised status still renders, in the neutral variant: a typo in the
+  // registry should look wrong, not vanish.
+  const { label, variant } = STATUS_CHIP[status] ?? { label: status, variant: 'shell' };
+  return `<span class="elv-chip elv-chip-${esc(variant)}">${esc(label)}</span>`;
 }
 
 /**
@@ -82,7 +124,7 @@ function chip(status) {
  * the same initials and accent as that module's launcher card: the rail and the
  * grid name things the same way.
  */
-export function renderRail(pathname) {
+export function renderRail(pathname, viewer = null) {
   const links = entries()
     .map(([prefix, entry]) => {
       const current = isCurrent(prefix, pathname);
@@ -113,7 +155,8 @@ export function renderRail(pathname) {
   </button>
   <ul class="elv-rail-links">
       ${links}
-  </ul>`;
+  </ul>
+  ${viewerFoot(viewer)}`;
 }
 
 /**
@@ -137,6 +180,61 @@ export function renderCards(group = 'Modules') {
       </a>`;
     })
     .join('\n      ');
+}
+
+/**
+ * A branded page for a module that is listed but not built.
+ *
+ * The point of this is that the hub reads as complete on day one: a department
+ * can be announced the day it is decided rather than the day it ships, and the
+ * "Soon" chip in the rail then leads somewhere that looks deliberate instead of
+ * to a 404. It carries the same placeholders as the portal's own pages, so the
+ * injector fills it by the ordinary path — a coming-soon page is not a special
+ * kind of page, just an empty one.
+ */
+export function renderComingSoon(prefix, entry) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>${esc(entry.label)} · Elevrics Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/chrome.css">
+<link rel="stylesheet" href="/css/portal.css">
+</head>
+<body>
+
+<nav class="elv-rail" aria-label="Portal" data-portal-nav></nav>
+
+<header class="hero">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">Elevrics Internal</p>
+    <div class="hero-rule"></div>
+    <h1>${esc(entry.label)} <span class="elv-chip elv-chip-soon">Soon</span></h1>
+    <p class="hero-sub">${esc(entry.blurb)}</p>
+  </div>
+</header>
+
+<main>
+  <section class="section">
+    <p class="section-label">Status</p>
+    <div class="empty">
+      <h2>This module is on the way</h2>
+      <p>It will appear at <code>${esc(prefix)}</code> with the same chrome as
+         the rest of the portal, behind the same Cloudflare Access application.
+         Nothing is deployed here yet.</p>
+    </div>
+  </section>
+</main>
+
+<footer>Elevrics internal · not indexed · access controlled by Cloudflare Access</footer>
+
+</body>
+</html>`;
 }
 
 export { MODULES };

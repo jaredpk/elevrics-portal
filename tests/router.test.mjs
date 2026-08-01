@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { isDocumentRequest } = await import('../src/chrome.js');
+const { isDocumentRequest, viewerFor } = await import('../src/chrome.js');
+const { matchComingSoon } = await import('../src/modules.js');
 const router = await import('../src/router.js');
 const {
   matchModule,
@@ -115,12 +116,39 @@ test('a registry entry with no origin is never proxied', () => {
 test('chrome is injected into the portal\'s own pages', async () => {
   const { serve } = assetSpy();
   const calls = [];
-  const inject = (response, pathname) => {
-    calls.push(pathname);
+  const inject = (response, ctx) => {
+    calls.push(ctx);
     return response;
   };
   await handleRequest(new Request('https://portal.elevrics.ai/admin/'), serve, inject);
-  assert.deepEqual(calls, ['/admin/']);
+  assert.deepEqual(calls, [{ pathname: '/admin/', mode: 'placeholder', viewer: null }]);
+});
+
+// ---- Who is signed in ----
+
+test('the Access identity is read off the request, and is absent locally', () => {
+  const withHeader = new Request('https://portal.elevrics.ai/', {
+    headers: { 'Cf-Access-Authenticated-User-Email': 'jared@elevrics.ai' },
+  });
+  assert.equal(viewerFor(withHeader), 'jared@elevrics.ai');
+  // No Access in front of `wrangler dev` — the rail shows no footer at all
+  // rather than an empty one.
+  assert.equal(viewerFor(new Request('https://portal.elevrics.ai/')), null);
+});
+
+test('the viewer reaches both the portal pages and the proxied modules', async () => {
+  const { serve } = assetSpy();
+  const seen = [];
+  const inject = (response, ctx) => {
+    seen.push(ctx.viewer);
+    return response;
+  };
+  const headers = {
+    'Cf-Access-Authenticated-User-Email': 'jared@elevrics.ai',
+    'Sec-Fetch-Dest': 'document',
+  };
+  await handleRequest(new Request('https://portal.elevrics.ai/', { headers }), serve, inject);
+  assert.deepEqual(seen, ['jared@elevrics.ai']);
 });
 
 test('chrome is never injected into a parked host', async () => {
@@ -139,6 +167,68 @@ test('the router routes identically with no injector supplied', async () => {
   const res = await handleRequest(new Request('https://portal.elevrics.ai/admin/'), serve);
   assert.equal(await res.text(), 'ASSET');
   assert.deepEqual(seen, ['/admin/']);
+});
+
+// ---- Listed but not built ----
+
+/** Adds a coming-soon entry for the duration of one test. */
+async function withComingSoon(fn) {
+  MODULES['/demands'] = {
+    label: 'Demands', initials: 'DM', accent: 'blue', group: 'Modules',
+    status: 'coming_soon', stack: 'not built yet',
+    blurb: 'Demand drafting throughput and the settlement pipeline.',
+  };
+  try {
+    await fn();
+  } finally {
+    delete MODULES['/demands'];
+  }
+}
+
+test('a listed-but-unbuilt module is matched, bare or with a trailing slash', async () => {
+  await withComingSoon(() => {
+    assert.equal(matchComingSoon('/demands').prefix, '/demands');
+    assert.equal(matchComingSoon('/demands/').prefix, '/demands');
+  });
+});
+
+test('an unbuilt module has no sub-pages', async () => {
+  await withComingSoon(() => {
+    // Exact match only. Answering 200 for a URL nobody published would be worse
+    // than the 404 — it would invent pages that never existed.
+    assert.equal(matchComingSoon('/demands/anything'), null);
+    assert.equal(matchComingSoon('/demands/2026/q1'), null);
+  });
+});
+
+test('an unbuilt module is never proxied, and never shadows a real one', async () => {
+  await withComingSoon(() => {
+    assert.equal(matchModule('/demands'), null, 'a module with no origin was proxied');
+    assert.equal(matchComingSoon('/solayard'), null, 'a live module was treated as unbuilt');
+    assert.equal(matchComingSoon('/'), null);
+  });
+});
+
+test('an unbuilt module serves a branded page instead of a 404', async () => {
+  await withComingSoon(async () => {
+    const { seen, serve } = assetSpy();
+    const res = await handleRequest(new Request('https://portal.elevrics.ai/demands'), serve);
+    const body = await res.text();
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('Content-Type') ?? '', /text\/html/);
+    assert.match(body, /Demands/);
+    assert.match(body, /elv-chip-soon">Soon</);
+    // It carries the rail placeholder, so the injector fills it by the ordinary
+    // path — an unbuilt page is not a special kind of page, just an empty one.
+    assert.match(body, /data-portal-nav/);
+    assert.deepEqual(seen, [], 'the assets binding was consulted for a generated page');
+  });
+});
+
+test('an unknown path is still a plain 404 from the assets binding', async () => {
+  const { seen, serve } = assetSpy();
+  await handleRequest(new Request('https://portal.elevrics.ai/nope'), serve);
+  assert.deepEqual(seen, ['/nope'], 'a miss was answered with a coming-soon page');
 });
 
 // ---- Chrome over the proxied modules ----
