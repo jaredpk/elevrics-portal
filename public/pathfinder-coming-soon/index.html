@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Parked hostname. Keep noindex until there is a real product here — the
+     same discipline the relocation app uses, and the reason not to accumulate
+     search results for something half-built under the Elevrics name. -->
+<meta name="robots" content="noindex, nofollow">
+<title>Pathfinder — Elevrics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:      #071833;
+    --purple:    #7B2CBF;
+    --teal:      #00A19A;
+    --blue:      #3C6FF0;
+    --offwhite:  #F7F8FB;
+    --midgray:   #6C7383;
+    --charcoal:  #22222A;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--offwhite);
+    color: var(--charcoal);
+    line-height: 1.6;
+  }
+  main { max-width: 34rem; text-align: center; }
+  .mark { margin-bottom: 28px; }
+  h1 {
+    margin: 0 0 14px;
+    font-size: clamp(2rem, 6vw, 2.75rem);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    color: var(--navy);
+  }
+  .rule {
+    width: 48px;
+    height: 3px;
+    margin: 0 auto 22px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--purple), var(--blue), var(--teal));
+  }
+  p { margin: 0 auto 10px; max-width: 30rem; color: var(--midgray); }
+  .soon {
+    display: inline-block;
+    margin-bottom: 22px;
+    padding: 5px 14px;
+    border-radius: 999px;
+    background: rgba(123, 44, 191, 0.09);
+    color: var(--purple);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  footer { margin-top: 38px; font-size: 0.87rem; color: var(--midgray); }
+  a { color: var(--blue); text-decoration: none; font-weight: 500; }
+  a:hover { text-decoration: underline; }
+  @media (prefers-color-scheme: dark) {
+    body { background: var(--navy); color: var(--offwhite); }
+    h1 { color: #FFFFFF; }
+    p, footer { color: #9AA3B2; }
+    a { color: #7FA3FF; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+  <div class="mark">
+    <svg width="42" height="35" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Elevrics">
+      <defs>
+        <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9B5CF6"/><stop offset="100%" stop-color="#7B2CBF"/></linearGradient>
+        <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6D8EF8"/><stop offset="100%" stop-color="#3C6FF0"/></linearGradient>
+        <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2EC4BD"/><stop offset="100%" stop-color="#00A19A"/></linearGradient>
+      </defs>
+      <rect x="0" y="11" width="6" height="9" rx="2" fill="url(#g1)"/>
+      <rect x="9" y="5.5" width="6" height="14.5" rx="2" fill="url(#g2)"/>
+      <rect x="18" y="0" width="6" height="20" rx="2" fill="url(#g3)"/>
+    </svg>
+  </div>
+
+  <span class="soon">Coming soon</span>
+  <h1>Pathfinder</h1>
+  <div class="rule"></div>
+
+  <p>Something new from Elevrics. Not ready to show yet.</p>
+
+  <footer>
+    In the meantime — <a href="https://elevrics.ai">elevrics.ai</a>
+  </footer>
+
+</main>
+</body>
+</html>

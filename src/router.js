@@ -36,6 +36,27 @@ export const MODULES = {
   },
 };
 
+/**
+ * Hostnames parked on this Worker that are NOT the portal.
+ *
+ * These are public — no Access application covers them — so module proxying
+ * must never apply here. Without this guard, pathfinder.elevrics.ai/solayard
+ * would proxy to the internal dashboard. The origins would still reject it for
+ * carrying no Access token, but it would confirm to an anonymous visitor that
+ * the module exists, and it relies on the origin to catch something this
+ * router should never have forwarded.
+ *
+ * Every path on a parked host serves its placeholder, which is self-contained
+ * (inline CSS) so there are no sub-resources to route.
+ */
+export const PARKED_HOSTS = {
+  'pathfinder.elevrics.ai': '/pathfinder-coming-soon/',
+};
+
+export function matchParkedHost(hostname) {
+  return PARKED_HOSTS[hostname] ?? null;
+}
+
 export function matchModule(pathname) {
   for (const [prefix, config] of Object.entries(MODULES)) {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
@@ -80,6 +101,19 @@ export function reprefixCookiePath(cookie, prefix) {
  */
 export async function handleRequest(request, serveAssets) {
   const url = new URL(request.url);
+
+  // Parked hosts are checked before anything path-based, so no request on a
+  // public hostname can reach a module.
+  const parked = matchParkedHost(url.hostname);
+  if (parked) {
+    const assetUrl = new URL(url);
+    assetUrl.pathname = parked;
+    assetUrl.search = '';
+    const response = await serveAssets(new Request(assetUrl, { method: 'GET' }));
+    const headers = new Headers(response.headers);
+    headers.set('X-Robots-Tag', 'noindex, nofollow');
+    return new Response(response.body, { ...response, headers });
+  }
 
   const match = matchModule(url.pathname);
   if (!match) return serveAssets(request);

@@ -2,7 +2,59 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const router = await import('../src/router.js');
-const { matchModule, reprefixLocation, reprefixCookiePath, MODULES } = router;
+const {
+  matchModule,
+  reprefixLocation,
+  reprefixCookiePath,
+  matchParkedHost,
+  handleRequest,
+  MODULES,
+} = router;
+
+/** Records what the asset layer was asked for, so host routing is observable. */
+function assetSpy() {
+  const seen = [];
+  const serve = async (req) => {
+    seen.push(new URL(req.url).pathname);
+    return new Response('ASSET', { status: 200 });
+  };
+  return { seen, serve };
+}
+
+test('a parked host is recognised; the portal host is not', () => {
+  assert.equal(matchParkedHost('pathfinder.elevrics.ai'), '/pathfinder-coming-soon/');
+  assert.equal(matchParkedHost('portal.elevrics.ai'), null);
+});
+
+test('every path on a parked host serves the placeholder', async () => {
+  const { seen, serve } = assetSpy();
+  for (const path of ['/', '/anything', '/deep/nested/path']) {
+    await handleRequest(new Request(`https://pathfinder.elevrics.ai${path}`), serve);
+  }
+  assert.deepEqual(seen, ['/pathfinder-coming-soon/', '/pathfinder-coming-soon/', '/pathfinder-coming-soon/']);
+});
+
+test('a parked host can NEVER reach an internal module', async () => {
+  const { seen, serve } = assetSpy();
+  // These paths would proxy to the internal dashboards on the portal host.
+  for (const path of ['/solayard', '/opportunities/api/leads', '/pathfinder/methodology']) {
+    const res = await handleRequest(new Request(`https://pathfinder.elevrics.ai${path}`), serve);
+    assert.equal(await res.text(), 'ASSET', `${path} escaped to a module`);
+  }
+  assert.ok(seen.every((p) => p === '/pathfinder-coming-soon/'), `leaked: ${seen}`);
+});
+
+test('the placeholder is served noindex', async () => {
+  const { serve } = assetSpy();
+  const res = await handleRequest(new Request('https://pathfinder.elevrics.ai/'), serve);
+  assert.match(res.headers.get('X-Robots-Tag') ?? '', /noindex/);
+});
+
+test('the portal host still falls through to assets for non-module paths', async () => {
+  const { seen, serve } = assetSpy();
+  await handleRequest(new Request('https://portal.elevrics.ai/admin/'), serve);
+  assert.deepEqual(seen, ['/admin/']);
+});
 
 test('matches a module on its bare prefix', () => {
   assert.equal(matchModule('/solayard').prefix, '/solayard');

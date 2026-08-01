@@ -44,6 +44,21 @@ can't escape its module.
 `/pathfinder` is **passed through whole**: Next.js `basePath` expects to see
 `/pathfinder` in the path and generates correctly prefixed asset URLs on its own.
 
+### Parked hosts
+
+`pathfinder.elevrics.ai` is parked on this same Worker, serving a public
+"coming soon" placeholder from `public/pathfinder-coming-soon/`. The name is
+reserved for future onboarding/marketing use; the internal relocation tool
+lives at `portal.elevrics.ai/pathfinder` and is unrelated.
+
+Parked hosts are matched **before** any path routing, so a public hostname can
+never reach an internal module — without that guard,
+`pathfinder.elevrics.ai/solayard` would proxy to the internal dashboard. The
+origin would still reject it for carrying no Access token, but it would confirm
+to an anonymous visitor that the module exists. Asserted in `tests/`.
+
+No Access application covers a parked host — that is the point. Do not add one.
+
 ---
 
 ## Authentication
