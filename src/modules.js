@@ -6,18 +6,24 @@
  * from it. Adding a module is an entry here; it is never new plumbing, and it is
  * never a second copy of the nav pasted into another page.
  *
- * Two kinds of entry, distinguished by ONE field:
+ * Three kinds of entry:
  *
- *   - has `origin`  → a proxied module. The router forwards to it.
- *   - no `origin`   → a portal-owned page served from public/ by the assets
- *                     binding. It still appears in the nav; it just isn't
- *                     something the router forwards anywhere.
- *
- * `matchModule()` keys off exactly that, so a portal-owned page can never be
- * mistaken for a proxy target — see the guard there.
+ *   - has `origin`     → a proxied module. The router forwards to it.
+ *   - no `origin`      → a portal-owned page served from public/ by the assets
+ *                        binding. It still appears in the nav; it just isn't
+ *                        something the router forwards anywhere.
+ *   - `external: true` → a destination on another host, LINKED and never
+ *                        proxied. Keyed by its URL instead of a path, which is
+ *                        what makes proxying it structurally impossible rather
+ *                        than merely discouraged.
  *
  * Key = the routing prefix, and also the path shown in a card's meta line.
  * `href` overrides the link target when the two differ (/admin vs /admin/).
+ * An external entry's key IS its href.
+ *
+ * `matchModule()` only ever forwards an entry that has an origin AND a key that
+ * starts with "/", so neither a portal-owned page nor an external destination
+ * can be mistaken for a proxy target — see the guard there.
  *
  * `status` drives the chip in the rail and on the card. Only a non-`live`
  * status renders one — chipping everything is noise, and the point of the chip
@@ -77,6 +83,29 @@ export const MODULES = {
       'must-have thresholds and per-row confidence bands.',
   },
 
+  // Linked, never proxied. finapp receives Plaid webhooks, serves an MCP
+  // endpoint and runs its own OAuth server (issuer = APP_URL) — none of those
+  // callers can present a Cloudflare Access token, and webhook failures are
+  // silent, surfacing days later as stale transactions. It also has its own
+  // Supabase login, so Access would be a second sign-in rather than the sign-in.
+  //
+  // Keyed by its URL rather than a path so it CANNOT become a route: matchModule()
+  // only considers keys starting with "/". Do NOT add an `origin` here — that is
+  // the field that turns an entry into a proxy target, and proxying this is
+  // precisely what breaks it.
+  'https://finance.elevrics.ai': {
+    external: true,
+    label: 'Finance',
+    initials: 'FN',
+    accent: 'green',
+    group: 'Modules',
+    status: 'live',
+    stack: 'separate sign-in',
+    blurb:
+      'Net worth, accounts, transactions, budgets and cashflow, linked ' +
+      'through Plaid.',
+  },
+
   '/admin': {
     // No origin: static markup in public/admin/, served by the assets binding.
     href: '/admin/',
@@ -112,5 +141,15 @@ export function entries() {
  */
 export function isCurrent(prefix, pathname) {
   if (prefix === '/') return pathname === '/';
+  if (MODULES[prefix]?.external) return false; // never "here" — it's another host
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+/**
+ * What a card's meta line shows before the stack. A path for anything on the
+ * portal; the bare hostname for an external destination, since the scheme is
+ * noise and the host is the point.
+ */
+export function metaPathFor(prefix) {
+  return MODULES[prefix].external ? prefix.replace(/^https?:\/\//, '') : prefix;
 }

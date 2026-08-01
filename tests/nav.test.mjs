@@ -18,6 +18,48 @@ test('every registry entry appears in the rail', () => {
   }
 });
 
+test('an external destination is linked, never routed', () => {
+  // finapp takes Plaid webhooks and runs its own OAuth server; proxying it
+  // would block every caller that cannot present an Access token, and those
+  // failures are silent. Keying it by URL is what makes that impossible.
+  for (const [prefix, entry] of Object.entries(MODULES)) {
+    if (!entry.external) continue;
+    assert.ok(!prefix.startsWith('/'), `${prefix} is external but keyed as a path`);
+    assert.equal(entry.origin, undefined, `${prefix} is external AND has an origin — it would be proxied`);
+  }
+});
+
+test('an external link opens away from the portal, and says so', () => {
+  const rail = renderRail('/');
+  const cards = renderCards();
+  for (const [prefix, entry] of Object.entries(MODULES)) {
+    if (!entry.external) continue;
+    for (const [what, html] of [['rail', rail], ['card', cards]]) {
+      const link = html.match(new RegExp(`<a[^>]*href="${prefix}"[^>]*>`))?.[0] ?? '';
+      assert.match(link, /target="_blank"/, `${what}: ${prefix} does not open a new tab`);
+      assert.match(link, /rel="noopener"/, `${what}: ${prefix} is missing rel=noopener`);
+    }
+  }
+  // The arrow is decorative — the announcement has to be real text.
+  assert.match(rail, /aria-hidden="true">\u2197</);
+  assert.match(rail, /class="sr-only"> \(opens in a new tab\)</);
+});
+
+test('an external destination is never the current page', () => {
+  // It is another origin; no portal path can be "inside" it.
+  for (const prefix of Object.keys(MODULES)) {
+    if (!MODULES[prefix].external) continue;
+    for (const path of ['/', '/admin/', prefix, `${prefix}/accounts`]) {
+      assert.ok(!isCurrent(prefix, path), `${prefix} marked current for ${path}`);
+    }
+  }
+});
+
+test('an external card shows its host, not its scheme', () => {
+  assert.match(renderCards(), /finance\.elevrics\.ai · separate sign-in/);
+  assert.doesNotMatch(renderCards(), /https:\/\/finance\.elevrics\.ai ·/);
+});
+
 test('the rail links nowhere the registry does not', () => {
   const hrefs = [...renderRail('/').matchAll(/<a class="rail-\w+" href="([^"]+)"/g)].map((m) => m[1]);
   const known = new Set(Object.keys(MODULES).map(hrefFor));
@@ -77,12 +119,13 @@ test('only a non-live status gets a chip', () => {
 test('the launcher renders a card per grouped module, and none for Home', () => {
   const html = renderCards();
   const grouped = Object.entries(MODULES).filter(([, e]) => e.group === 'Modules');
-  assert.equal([...html.matchAll(/class="card"/g)].length, grouped.length);
+  // `card` or `card card-external` — match the class token, not the whole value.
+  assert.equal([...html.matchAll(/class="card[ "]/g)].length, grouped.length);
   for (const [prefix, entry] of grouped) {
     assert.match(html, new RegExp(`href="${hrefFor(prefix)}"`));
     assert.match(html, new RegExp(`icon-${entry.accent}`));
   }
-  assert.doesNotMatch(html, /class="card" href="\/"/, 'the launcher linked to itself');
+  assert.doesNotMatch(html, /class="card[ "][^>]*href="\/"/, 'the launcher linked to itself');
 });
 
 test('a card meta line names the module path and its stack', () => {

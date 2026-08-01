@@ -20,9 +20,12 @@
                                       a font — nav labels, eyebrows, hero titles
      mono tier       --font-mono      provenance and status metadata only
 
-   The three module accents (purple/blue/teal/gray) are IDENTITY, not palette:
+   The module accents (purple/blue/teal/green/gray) are IDENTITY, not palette:
    each module's tile carries the same colour in the rail and on its launcher
-   card, so the two name things the same way. Don't reuse them for meaning.
+   card, so the two name things the same way. Don't reuse them for meaning, and
+   when adding one, check it against the tiles already there — the collapsed
+   rail is 34px of colour and two letters, so two adjacent hues stop being
+   wayfinding.
    ========================================================================== */
 
 :root {
@@ -48,6 +51,7 @@
   --purple: #7B2CBF;
   --blue:   #3C6FF0;
   --teal:   #00A19A;
+  --green:  #10B981;
 
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
@@ -386,6 +390,7 @@ a.card:hover {
 .icon-blue   { background: linear-gradient(180deg, #6D8EF8, var(--blue)); }
 .icon-teal   { background: linear-gradient(180deg, #2EC4BD, var(--teal)); }
 .icon-gray   { background: linear-gradient(180deg, #8B93A3, var(--muted)); }
+.icon-green  { background: linear-gradient(180deg, #34D399, var(--green)); }
 
 .card h2 {
   margin: 0 0 6px;
@@ -408,6 +413,34 @@ a.card:hover {
   font-size: 0.78rem;
   font-family: var(--font-mono);
   color: var(--muted);
+}
+
+/* ---------- Leaving the portal ----------
+   Finance is linked, not proxied, and it has its own sign-in — so a click that
+   leaves the origin should look different from one that doesn't. The arrow is
+   decorative (aria-hidden in the markup); the announcement rides on .sr-only. */
+
+.ext-mark {
+  margin-left: 5px;
+  font-size: 0.82em;
+  font-weight: 500;
+  color: var(--muted);
+  vertical-align: baseline;
+}
+
+.card-external h2 .ext-mark { font-size: 0.72em; }
+
+/* Available to assistive tech, invisible on screen. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ---------- Empty / placeholder states ---------- */

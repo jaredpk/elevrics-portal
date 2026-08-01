@@ -48,15 +48,23 @@ export function matchParkedHost(hostname) {
 /**
  * Find the module that should serve this path, if any.
  *
- * Registry entries without an `origin` are portal-owned pages (the launcher,
- * the admin shell) — they belong in the nav but there is nowhere to forward
- * them, so they are skipped here and fall through to the assets binding. That
- * check has to come first: "/" is a registry entry, and every path starts
- * with it.
+ * Two things are skipped, and both matter:
+ *
+ * Entries without an `origin` are portal-owned pages (the launcher, the admin
+ * shell) — they belong in the nav but there is nowhere to forward them, so they
+ * fall through to the assets binding. That check has to come first: "/" is a
+ * registry entry, and every path starts with it.
+ *
+ * Entries keyed by a URL rather than a path are external destinations (Finance),
+ * which must be LINKED and never proxied — finapp's Plaid webhooks and OAuth
+ * callers can't present an Access token, and those failures are silent. Keying
+ * them by URL means no `pathname` can ever match, so this holds even if someone
+ * later adds an `origin` to one.
  */
 export function matchModule(pathname) {
   for (const [prefix, config] of Object.entries(MODULES)) {
     if (!config.origin) continue;
+    if (!prefix.startsWith('/')) continue;
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
       return { prefix, config };
     }

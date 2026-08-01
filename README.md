@@ -20,6 +20,7 @@ onto a path:
 | `/solayard` | `solayard-intel.fly.dev` | `jaredpk/solayard-intel` |
 | `/opportunities` | `elevrics-opportunities.fly.dev` | `jaredpk/elevrics-opportunities` |
 | `/pathfinder` | `elevrics-relocation.fly.dev` | `jaredpk/elevrics-relocation` |
+| Finance (link out) | `finance.elevrics.ai` | `jaredpk/finapp-v3` |
 
 `src/modules.js` is the registry — the single source of truth for what the
 portal contains. `src/router.js` proxies from it, `src/nav.js` renders the nav
@@ -46,10 +47,21 @@ Adding a module is an entry in `src/modules.js` — its origin, whether the pref
 is stripped, and the presentation fields (label, blurb, stack line) that the nav
 and the launcher card need. Nothing else has to change.
 
-Entries with an `origin` are proxied. Entries without one (`/`, `/admin`) are
-portal-owned pages served from `public/`; they still appear in the nav, but
-`matchModule()` skips them so they fall through to `ASSETS`. That check is why
-`/` — a prefix of every path — can safely live in the registry.
+Three kinds of entry:
+
+- **Proxied** — has an `origin`. The router forwards to it.
+- **Portal-owned** — no `origin` (`/`, `/admin`). Served from `public/`; still
+  in the nav, but `matchModule()` skips it so it falls through to `ASSETS`.
+  That check is why `/` — a prefix of every path — can safely live here.
+- **External** — `external: true`, keyed by its URL instead of a path
+  (Finance). Linked and never proxied.
+
+The URL key is the point, not a formatting choice: `matchModule()` only
+forwards entries whose key starts with `/`, so no `pathname` can ever match an
+external entry — the guard holds even if someone later adds an `origin` to one,
+reading it as "where it lives" rather than "proxy this". Both halves are
+asserted in `tests/`, because getting it wrong breaks Plaid webhooks silently
+(see below).
 
 Both static pages carry `<nav data-portal-nav>` and (on the launcher)
 `<div class="card-grid" data-portal-cards>` placeholders, which the Worker fills
@@ -100,6 +112,27 @@ can't escape its module.
 
 `/pathfinder` is **passed through whole**: Next.js `basePath` expects to see
 `/pathfinder` in the path and generates correctly prefixed asset URLs on its own.
+
+### Why Finance links out instead of being proxied
+
+`finapp-v3` receives Plaid webhooks, serves an MCP endpoint, and runs its own
+OAuth server (`/.well-known/oauth-authorization-server`, issuer = `APP_URL`).
+None of those callers can present a Cloudflare Access token, so proxying it
+behind the portal would block them — and webhook failures are silent, surfacing
+days later as stale transactions. It also has its own Supabase login, so Access
+would be a second sign-in rather than the sign-in.
+
+It stays on `finance.elevrics.ai` with a launcher card pointing at it. The
+portal is still the single front door; only this one card leaves the origin.
+
+In the registry it is `external: true` and keyed by its URL, which is what makes
+proxying it structurally impossible rather than merely discouraged. Both the
+rail entry and the card open in a new tab and carry an ↗ affordance plus
+screen-reader text, so leaving the portal is visible rather than surprising.
+
+One consequence for the chrome work: the rail cannot follow you to Finance. It
+is a separate origin the Worker never sees, so there is nothing to inject into
+— the ↗ is doing real work there, marking the one edge of the portal.
 
 ### Parked hosts
 

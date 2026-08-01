@@ -75,6 +75,33 @@ test('falls through for the shell and admin', () => {
   assert.equal(matchModule('/css/portal.css'), null);
 });
 
+test('an external registry entry can never be routed to', () => {
+  // The guard that matters most: finapp must be LINKED, not proxied. Its Plaid
+  // webhooks and OAuth callers carry no Access token, and the breakage is
+  // silent. Keyed by URL, no pathname can match — even if an origin appears.
+  for (const [prefix, config] of Object.entries(MODULES)) {
+    if (!config.external) continue;
+    assert.equal(matchModule(prefix), null);
+    for (const path of ['/finance', '/finance/accounts', prefix, `${prefix}/webhook`]) {
+      assert.equal(matchModule(path), null, `${path} routed to an external destination`);
+    }
+  }
+});
+
+test('adding an origin to an external entry still does not route it', () => {
+  // Defends the exact mistake someone would make later: reading `origin` as
+  // "where it lives" rather than "proxy this".
+  const key = Object.keys(MODULES).find((k) => MODULES[k].external);
+  MODULES[key].origin = 'https://finance.elevrics.ai';
+  try {
+    for (const path of ['/finance', '/', '/admin/', key]) {
+      assert.equal(matchModule(path), null, `${path} became routable`);
+    }
+  } finally {
+    delete MODULES[key].origin;
+  }
+});
+
 test('a registry entry with no origin is never proxied', () => {
   // "/" and "/admin" are in the registry so they appear in the nav. Nothing to
   // forward them to, and "/" is a prefix of every path — both must fall through.

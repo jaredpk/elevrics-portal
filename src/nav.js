@@ -11,7 +11,7 @@
  * renderer and one registry behind it.
  */
 
-import { MODULES, entries, hrefFor, isCurrent } from './modules.js';
+import { MODULES, entries, hrefFor, isCurrent, metaPathFor } from './modules.js';
 
 /**
  * The registry is static and authored here, so this guards against typos in our
@@ -54,6 +54,18 @@ const PIN_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
   <path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/>
 </svg>`;
 
+/**
+ * The attributes and affordance for a link that leaves the portal.
+ *
+ * The arrow is decorative, so it is hidden from assistive tech and paired with
+ * real text — a new tab opening unannounced is disorienting for a screen-reader
+ * user, and "↗" alone announces as nothing or as garbage.
+ */
+const EXTERNAL_ATTRS = ' target="_blank" rel="noopener"';
+const EXTERNAL_MARK =
+  '<span class="ext-mark" aria-hidden="true">\u2197</span>' +
+  '<span class="sr-only"> (opens in a new tab)</span>';
+
 /** A status chip, or nothing at all when the thing is simply live. */
 function chip(status) {
   if (!status || status === 'live') return '';
@@ -78,10 +90,11 @@ export function renderRail(pathname) {
         prefix === '/'
           ? `<span class="rail-tile rail-tile-home">${HOME_GLYPH}</span>`
           : `<span class="rail-tile icon-${esc(entry.accent)}">${esc(entry.initials)}</span>`;
+      const external = entry.external ? EXTERNAL_ATTRS : '';
       return `<li>
-        <a class="rail-link" href="${esc(hrefFor(prefix))}"${current ? ' aria-current="page"' : ''}>
+        <a class="rail-link" href="${esc(hrefFor(prefix))}"${current ? ' aria-current="page"' : ''}${external}>
           ${marker}
-          <span class="rail-label">${esc(entry.label)}</span>
+          <span class="rail-label">${esc(entry.label)}${entry.external ? EXTERNAL_MARK : ''}</span>
           ${chip(entry.status)}
         </a>
       </li>`;
@@ -111,13 +124,14 @@ export function renderCards(group = 'Modules') {
   return entries()
     .filter(([, entry]) => entry.group === group)
     .map(([prefix, entry]) => {
-      const meta = `${prefix} · ${entry.stack}`;
-      return `<a class="card" href="${esc(hrefFor(prefix))}">
+      const meta = `${metaPathFor(prefix)} · ${entry.stack}`;
+      const external = entry.external ? EXTERNAL_ATTRS : '';
+      return `<a class="card${entry.external ? ' card-external' : ''}" href="${esc(hrefFor(prefix))}"${external}>
         <div class="card-head">
           <div class="card-icon icon-${esc(entry.accent)}">${esc(entry.initials)}</div>
           ${chip(entry.status)}
         </div>
-        <h2>${esc(entry.label)}</h2>
+        <h2>${esc(entry.label)}${entry.external ? EXTERNAL_MARK : ''}</h2>
         <p>${esc(entry.blurb)}</p>
         <div class="card-meta">${esc(meta)}</div>
       </a>`;
