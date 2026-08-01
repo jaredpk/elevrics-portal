@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "elevrics-portal",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-01",
+
+  // Only public/ ships. The auto-generated config used ".", which tried to
+  // upload the whole repo — including node_modules/workerd at 122 MiB, well
+  // past the 25 MiB per-asset limit. Keeping the assets directory separate
+  // from the repo root is what prevents that.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}

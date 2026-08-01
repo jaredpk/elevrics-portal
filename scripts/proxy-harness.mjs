@@ -4,7 +4,7 @@
  * is exercised end to end rather than unit-tested in isolation.
  */
 import http from 'node:http';
-import { onRequest, MODULES } from '../functions/[[path]].js';
+import { handleRequest, MODULES } from '../src/router.js';
 
 // Point the module origins at the locally running apps.
 MODULES['/solayard'].origin = 'http://127.0.0.1:8077';
@@ -19,12 +19,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   const request = new Request(url, { method: req.method, headers });
-  // next() falls through to the static shell in real Pages Functions.
+  // Stands in for env.ASSETS.fetch in the deployed Worker.
   const next = async () => new Response('SHELL', { status: 200, headers: { 'x-served-by': 'shell' } });
 
   let out;
   try {
-    out = await onRequest({ request, next });
+    out = await handleRequest(request, next);
   } catch (e) {
     out = new Response(`harness error: ${e.stack}`, { status: 500 });
   }

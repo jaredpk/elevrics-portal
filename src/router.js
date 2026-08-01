@@ -1,8 +1,8 @@
 /**
- * Portal router — Cloudflare Pages Function (catch-all).
+ * Portal router.
  *
  * portal.elevrics.ai sits behind ONE Cloudflare Access application, so every
- * request that reaches this function is already authenticated. The
+ * request that reaches this router is already authenticated. The
  * Cf-Access-Jwt-Assertion header rides along to each origin unchanged, because
  * the origins must verify it themselves: the Fly hostnames stay publicly
  * reachable, and a direct hit on *.fly.dev has to be rejected there, not here.
@@ -10,6 +10,10 @@
  *
  * Anything that doesn't match a module prefix falls through to the static
  * shell (launcher at /, admin console at /admin).
+ *
+ * Transport-agnostic on purpose: handleRequest() takes the asset fallback as a
+ * parameter, so the Worker passes env.ASSETS.fetch and the local integration
+ * harness passes a stub. The routing logic under test is the deployed logic.
  */
 
 export const MODULES = {
@@ -70,12 +74,15 @@ export function reprefixCookiePath(cookie, prefix) {
   return `${cookie}; Path=${prefix}`;
 }
 
-export async function onRequest(context) {
-  const { request, next } = context;
+/**
+ * @param request  the incoming Request
+ * @param serveAssets  fallback for anything that isn't a module route
+ */
+export async function handleRequest(request, serveAssets) {
   const url = new URL(request.url);
 
   const match = matchModule(url.pathname);
-  if (!match) return next();
+  if (!match) return serveAssets(request);
 
   const { prefix, config } = match;
 

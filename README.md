@@ -10,8 +10,8 @@ internal only and is never indexed.
 
 ## What it does
 
-A Cloudflare Pages project that serves a static shell and reverse-proxies each
-tool onto a path:
+A Cloudflare Worker that serves a static shell and reverse-proxies each tool
+onto a path:
 
 | Path | Origin | Repo |
 |---|---|---|
@@ -21,8 +21,16 @@ tool onto a path:
 | `/opportunities` | `elevrics-opportunities.fly.dev` | `jaredpk/elevrics-opportunities` |
 | `/pathfinder` | `elevrics-relocation.fly.dev` | `jaredpk/elevrics-relocation` |
 
-Routing lives in `functions/[[path]].js` — a Pages Functions catch-all.
-Anything that doesn't match a module prefix falls through to the static shell.
+Routing lives in `src/router.js`; `src/index.js` is the Worker entrypoint.
+Static files in `public/` are served by the assets binding before the Worker
+runs, so it is only invoked for module routes and genuine misses — which are
+handed back to `ASSETS` so 404s come from the same place as the rest of the
+shell.
+
+> This is a **Worker with static assets**, not a Pages project. Cloudflare has
+> folded Pages into Workers, and "Connect to Git" now creates a Worker. The
+> Pages Functions convention (a `functions/` directory) is silently ignored
+> here — a repo laid out that way deploys fine and then routes nothing.
 
 ### Two proxying modes
 
@@ -55,14 +63,14 @@ itself — a direct hit on `*.fly.dev` has to be rejected there, not here.
 ```bash
 npm install          # only needed for wrangler
 npm test             # router unit tests — no network, no wrangler
-npx wrangler pages dev .
+npx wrangler dev
 ```
 
 `npm test` (in `tests/`) covers prefix matching, redirect rewriting and cookie scoping.
 
 For an end-to-end check against the real apps, start the three origins locally
 and run the integration harness — it imports the *actual* `onRequest` from
-`functions/[[path]].js` and only swaps the module origins for localhost, so it
+`src/router.js` and only swaps the module origins for localhost, so it
 exercises the real routing code rather than a reimplementation:
 
 ```bash
@@ -80,12 +88,17 @@ The check that matters is not just that each path returns 200, but that the URLs
 
 ## Deployment
 
-Cloudflare Pages, connected to this repo. Pushing to `main` deploys.
+Cloudflare Workers Builds, connected to this repo. Pushing to `main` deploys.
 
-Project settings:
+Everything that matters is in `wrangler.jsonc`; the dashboard build settings
+just need:
 - **Build command** — none (no build step)
-- **Output directory** — `/` (repo root)
-- **Functions** — picked up automatically from `functions/`
+- **Deploy command** — `npx wrangler deploy`
+- **Root directory** — `/`
+
+`assets.directory` is `./public` deliberately. Pointing it at the repo root
+sweeps in `node_modules/workerd` (122 MiB) and fails the 25 MiB per-asset
+limit.
 
 One-time Cloudflare setup:
 1. Point `portal.elevrics.ai` at the Pages project.
