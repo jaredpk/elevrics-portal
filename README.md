@@ -21,11 +21,17 @@ onto a path:
 | `/opportunities` | `elevrics-opportunities.fly.dev` | `jaredpk/elevrics-opportunities` |
 | `/pathfinder` | `elevrics-relocation.fly.dev` | `jaredpk/elevrics-relocation` |
 
-Routing lives in `src/router.js`; `src/index.js` is the Worker entrypoint.
-Static files in `public/` are served by the assets binding before the Worker
-runs, so it is only invoked for module routes and genuine misses — which are
-handed back to `ASSETS` so 404s come from the same place as the rest of the
-shell.
+Routing lives in `src/router.js`; `src/index.js` is the Worker entrypoint. The
+Worker runs on **every** request (`assets.run_worker_first`) and hands anything
+that isn't a module route back to `ASSETS`, so 404s come from the same place as
+the rest of the shell.
+
+> `run_worker_first: true` is load-bearing. Without it, Workers Static Assets
+> serve before the Worker runs: a request for `/` on *any* hostname matches
+> `public/index.html` and returns the portal launcher without the Worker ever
+> executing — which bypasses the parked-host check entirely and served the
+> internal launcher on the public `pathfinder.elevrics.ai`. Unit tests call
+> `handleRequest` directly and cannot catch this; it only shows up deployed.
 
 > This is a **Worker with static assets**, not a Pages project. Cloudflare has
 > folded Pages into Workers, and "Connect to Git" now creates a Worker. The

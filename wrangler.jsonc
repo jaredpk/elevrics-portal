@@ -10,7 +10,15 @@
   // from the repo root is what prevents that.
   "assets": {
     "directory": "./public",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+
+    // Required, not an optimisation choice. By default static assets are served
+    // BEFORE the Worker runs, so a request to any host for "/" matches
+    // public/index.html and returns the portal launcher without the Worker ever
+    // executing — which silently bypasses the parked-host check and served the
+    // internal launcher on the public pathfinder.elevrics.ai.
+    // With this set, the Worker runs first and decides what to serve.
+    "run_worker_first": true
   },
 
   "observability": {
