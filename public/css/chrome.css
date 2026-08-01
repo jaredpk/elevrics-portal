@@ -251,6 +251,146 @@ html.elv-rail-pinned .elv-rail-pin svg { transform: none; }
   font-weight: 600;
 }
 
+/* ---------- Quick switch ----------
+   Reached by ⌘K or the rail's search row. Sits above the rail's own z-index,
+   because on a proxied page it has to clear both the rail and whatever the
+   module stacks. */
+
+.elv-rail-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 24px);
+  margin: 12px 12px 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--elv-ease);
+}
+
+.elv-rail-search:hover { background: rgba(7, 24, 51, 0.04); }
+.elv-rail-search[hidden] { display: none; }
+
+.elv-rail-tile-search { background: rgba(7, 24, 51, 0.06); color: var(--elv-navy); }
+.elv-rail-tile-search svg { width: 16px; height: 16px; }
+
+.elv-rail-kbd {
+  display: none;
+  flex: none;
+  padding: 2px 6px;
+  border: 1px solid var(--elv-line);
+  border-radius: 5px;
+  background: var(--elv-paper);
+  color: var(--elv-muted);
+  font-family: var(--elv-font-mono);
+  font-size: 0.62rem;
+}
+
+.elv-rail:hover .elv-rail-kbd,
+.elv-rail:focus-within .elv-rail-kbd,
+html.elv-rail-pinned .elv-rail-kbd {
+  display: inline-block;
+}
+
+.elv-switch {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 16px 16px;
+  background: rgba(7, 24, 51, 0.38);
+  font-family: var(--elv-font-sans);
+}
+
+.elv-switch[hidden] { display: none; }
+
+.elv-switch-panel {
+  width: 100%;
+  max-width: 33rem;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--elv-white);
+  box-shadow: 0 24px 70px rgba(7, 24, 51, 0.32);
+}
+
+.elv-switch-input {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 17px 20px;
+  border: 0;
+  border-bottom: 1px solid var(--elv-line);
+  border-radius: 0;
+  background: var(--elv-white);
+  color: var(--elv-ink);
+  font-family: var(--elv-font-sans);
+  font-size: 0.98rem;
+}
+
+.elv-switch-input:focus { outline: none; }
+.elv-switch-input::placeholder { color: var(--elv-muted); }
+
+.elv-switch-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.elv-switch-opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.elv-switch-opt.is-active { background: var(--elv-accent-wash); }
+
+.elv-switch-opt-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--elv-navy);
+}
+
+.elv-switch-here {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(108, 115, 131, 0.16);
+  color: var(--elv-muted-ink);
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.elv-switch-empty {
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+  color: var(--elv-muted);
+  font-size: 0.86rem;
+}
+
+.elv-switch-empty[hidden] { display: none; }
+
 /* ---------- Who is signed in ----------
    Pinned below the links. Collapsed, the initial alone is the marker; opening
    the rail reveals the address. Cloudflare Access already knew this on every
@@ -456,6 +596,26 @@ html.elv-rail-pinned .elv-rail-viewer {
 
 .elv-rail-links { padding: 12px 12px 24px !important; }
 
+.elv-rail-search { font: inherit !important; background: transparent !important; border: 0 !important; text-align: left !important; }
+.elv-rail-search[hidden] { display: none !important; }
+.elv-rail-kbd { font-family: var(--elv-font-mono) !important; font-size: 0.62rem !important; color: var(--elv-muted) !important; }
+
+/* The overlay is built by script and lands as a plain <div> at the end of a
+   module's <body>, so it needs the same armour the rail does. */
+.elv-switch, .elv-switch * { box-sizing: border-box !important; }
+.elv-switch[hidden] { display: none !important; }
+.elv-switch-panel { background: var(--elv-white) !important; }
+.elv-switch-input {
+  font-family: var(--elv-font-sans) !important;
+  font-size: 0.98rem !important;
+  color: var(--elv-ink) !important;
+  background: var(--elv-white) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--elv-line) !important;
+}
+.elv-switch-list, .elv-switch-list li { list-style: none !important; margin: 0 !important; }
+.elv-switch-opt-label { font-size: 0.86rem !important; font-weight: 600 !important; color: var(--elv-navy) !important; }
+
 .elv-rail-foot { padding: 12px 15px !important; }
 .elv-rail-avatar { font-size: 0.72rem !important; font-weight: 700 !important; color: var(--elv-accent-ink) !important; }
 .elv-rail-viewer-label { font-size: 0.58rem !important; font-weight: 700 !important; color: var(--elv-muted) !important; }
@@ -535,8 +695,9 @@ html.elv-rail-pinned .elv-rail-viewer {
   .elv-rail-tile-home svg { width: 13px; height: 13px; }
   .elv-rail .elv-chip { display: none !important; }
 
-  /* No room for it in a 52px bar, and the pills are the priority there. */
+  /* No room for either in a 52px bar, and the pills are the priority there. */
   .elv-rail-foot { display: none !important; }
+  .elv-rail-search { display: none !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {

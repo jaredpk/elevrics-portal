@@ -49,6 +49,11 @@ const HOME_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
   <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
 </svg>`;
 
+/** The quick-switch affordance. Keyboard-only features nobody can see don't exist. */
+const SEARCH_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+</svg>`;
+
 /** Chevrons: point left to collapse when pinned, right to open when not. */
 const PIN_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/>
@@ -123,6 +128,10 @@ function chip(status) {
  * Collapsed, the tiles alone identify each destination, which is why they use
  * the same initials and accent as that module's launcher card: the rail and the
  * grid name things the same way.
+ *
+ * The quick-switch button ships `hidden` and is revealed by
+ * portal.js: it does nothing without JavaScript, and a control that does nothing
+ * is worse than no control. Everything else in the rail works either way.
  */
 export function renderRail(pathname, viewer = null) {
   const links = entries()
@@ -152,6 +161,11 @@ export function renderRail(pathname, viewer = null) {
   </a>
   <button type="button" class="elv-rail-pin" data-rail-pin aria-pressed="false" aria-label="Keep sidebar open">
     ${PIN_GLYPH}
+  </button>
+  <button type="button" class="elv-rail-search" data-rail-search hidden aria-haspopup="dialog">
+    <span class="elv-rail-tile elv-rail-tile-search">${SEARCH_GLYPH}</span>
+    <span class="elv-rail-label">Search</span>
+    <kbd class="elv-rail-kbd" data-rail-kbd></kbd>
   </button>
   <ul class="elv-rail-links">
       ${links}

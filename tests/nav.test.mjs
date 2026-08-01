@@ -4,11 +4,27 @@ import assert from 'node:assert/strict';
 import { renderRail, renderCards, renderComingSoon } from '../src/nav.js';
 import { MODULES, hrefFor, isCurrent } from '../src/modules.js';
 
+/** Registry entries that live on another host. */
+const externals = () => Object.entries(MODULES).filter(([, e]) => e.external);
+
 /**
  * The rail and the launcher grid are rendered from the registry, so the property
  * worth asserting is that they STAY derived from it — a link that exists in the
  * markup but not the registry is exactly the drift this replaced.
  */
+
+/**
+ * Assert a collection is non-empty before iterating it.
+ *
+ * Every `for (…) { assert(…) }` here is a test that proves nothing when its
+ * collection is empty, and it passes while proving nothing. That is not
+ * hypothetical: the `elv-` rename left one of these matching a class prefix
+ * that no longer existed, and the test went on passing against zero links.
+ */
+function some(list, what) {
+  assert.ok(list.length > 0, `nothing to check — ${what} matched nothing`);
+  return list;
+}
 
 test('every registry entry appears in the rail', () => {
   const html = renderRail('/');
@@ -22,8 +38,7 @@ test('an external destination is linked, never routed', () => {
   // finapp takes Plaid webhooks and runs its own OAuth server; proxying it
   // would block every caller that cannot present an Access token, and those
   // failures are silent. Keying it by URL is what makes that impossible.
-  for (const [prefix, entry] of Object.entries(MODULES)) {
-    if (!entry.external) continue;
+  for (const [prefix, entry] of some(externals(), 'external registry entries')) {
     assert.ok(!prefix.startsWith('/'), `${prefix} is external but keyed as a path`);
     assert.equal(entry.origin, undefined, `${prefix} is external AND has an origin — it would be proxied`);
   }
@@ -32,8 +47,7 @@ test('an external destination is linked, never routed', () => {
 test('an external link opens away from the portal, and says so', () => {
   const rail = renderRail('/');
   const cards = renderCards();
-  for (const [prefix, entry] of Object.entries(MODULES)) {
-    if (!entry.external) continue;
+  for (const [prefix] of some(externals(), 'external registry entries')) {
     for (const [what, html] of [['rail', rail], ['card', cards]]) {
       const link = html.match(new RegExp(`<a[^>]*href="${prefix}"[^>]*>`))?.[0] ?? '';
       assert.match(link, /target="_blank"/, `${what}: ${prefix} does not open a new tab`);
@@ -47,8 +61,7 @@ test('an external link opens away from the portal, and says so', () => {
 
 test('an external destination is never the current page', () => {
   // It is another origin; no portal path can be "inside" it.
-  for (const prefix of Object.keys(MODULES)) {
-    if (!MODULES[prefix].external) continue;
+  for (const [prefix] of some(externals(), 'external registry entries')) {
     for (const path of ['/', '/admin/', prefix, `${prefix}/accounts`]) {
       assert.ok(!isCurrent(prefix, path), `${prefix} marked current for ${path}`);
     }
@@ -61,7 +74,10 @@ test('an external card shows its host, not its scheme', () => {
 });
 
 test('the rail links nowhere the registry does not', () => {
-  const hrefs = [...renderRail('/').matchAll(/<a class="rail-\w+" href="([^"]+)"/g)].map((m) => m[1]);
+  const hrefs = some(
+    [...renderRail('/').matchAll(/<a class="elv-rail-\w+" href="([^"]+)"/g)].map((m) => m[1]),
+    'rail anchors',
+  );
   const known = new Set(Object.keys(MODULES).map(hrefFor));
   // The brand links home, which is a registry entry itself.
   for (const href of hrefs) assert.ok(known.has(href), `rail links to unregistered ${href}`);
@@ -120,7 +136,10 @@ test('only a non-live status gets a elv-chip', () => {
 
 test('the launcher renders a card per grouped module, and none for Home', () => {
   const html = renderCards();
-  const grouped = Object.entries(MODULES).filter(([, e]) => e.group === 'Modules');
+  const grouped = some(
+    Object.entries(MODULES).filter(([, e]) => e.group === 'Modules'),
+    'grouped registry entries',
+  );
   // `card` or `card card-external` — match the class token, not the whole value.
   assert.equal([...html.matchAll(/class="card[ "]/g)].length, grouped.length);
   for (const [prefix, entry] of grouped) {
@@ -137,6 +156,36 @@ test('a card meta line names the module path and its stack', () => {
 test('the card and the rail agree about status', () => {
   assert.match(renderCards(), /class="elv-chip elv-chip-shell">Shell</);
   assert.equal([...renderCards().matchAll(/class="elv-chip /g)].length, 1);
+});
+
+// ---- Quick switch ----
+
+test('the quick-switch button ships hidden, for script to reveal', () => {
+  // It does nothing without JavaScript, and a control that does nothing is
+  // worse than no control. Everything else in the rail works either way.
+  const html = renderRail('/');
+  assert.match(html, /<button type="button" class="elv-rail-search"[^>]*\shidden/);
+  assert.match(html, /data-rail-search/);
+  assert.match(html, /aria-haspopup="dialog"/);
+});
+
+test('the keyboard hint is left empty for the platform to fill', () => {
+  // ⌘K on a Mac, Ctrl K elsewhere — the server has no idea which, so it renders
+  // the element and portal.js writes the text.
+  assert.match(renderRail('/'), /<kbd class="elv-rail-kbd" data-rail-kbd><\/kbd>/);
+});
+
+test('the switcher has a list to read: every rail link is labelled', () => {
+  // It reads its destinations off the rail rather than carrying a second copy
+  // of the registry, so every link needs a label element to read.
+  const links = some(
+    [...renderRail('/').matchAll(/<a class="elv-rail-link"[\s\S]*?<\/a>/g)].map((m) => m[0]),
+    'rail links',
+  );
+  for (const link of links) {
+    assert.match(link, /class="elv-rail-label"/, `a rail link has no label: ${link.slice(0, 60)}`);
+    assert.match(link, /class="elv-rail-tile/, `a rail link has no tile: ${link.slice(0, 60)}`);
+  }
 });
 
 // ---- Who is signed in ----

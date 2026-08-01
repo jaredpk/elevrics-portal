@@ -13,6 +13,15 @@ const {
   MODULES,
 } = router;
 
+/**
+ * Assert a collection is non-empty before iterating it. A `for` loop over
+ * nothing asserts nothing, and passes while doing it.
+ */
+function some(list, what) {
+  assert.ok(list.length > 0, `nothing to check — ${what} matched nothing`);
+  return list;
+}
+
 /** Records what the asset layer was asked for, so host routing is observable. */
 function assetSpy() {
   const seen = [];
@@ -81,8 +90,8 @@ test('an external registry entry can never be routed to', () => {
   // The guard that matters most: finapp must be LINKED, not proxied. Its Plaid
   // webhooks and OAuth callers carry no Access token, and the breakage is
   // silent. Keyed by URL, no pathname can match — even if an origin appears.
-  for (const [prefix, config] of Object.entries(MODULES)) {
-    if (!config.external) continue;
+  const externals = Object.entries(MODULES).filter(([, c]) => c.external);
+  for (const [prefix] of some(externals, 'external registry entries')) {
     assert.equal(matchModule(prefix), null);
     for (const path of ['/finance', '/finance/accounts', prefix, `${prefix}/webhook`]) {
       assert.equal(matchModule(path), null, `${path} routed to an external destination`);
@@ -107,8 +116,8 @@ test('adding an origin to an external entry still does not route it', () => {
 test('a registry entry with no origin is never proxied', () => {
   // "/" and "/admin" are in the registry so they appear in the nav. Nothing to
   // forward them to, and "/" is a prefix of every path — both must fall through.
-  for (const [prefix, config] of Object.entries(MODULES)) {
-    if (config.origin) continue;
+  const unproxied = Object.entries(MODULES).filter(([, c]) => !c.origin);
+  for (const [prefix] of some(unproxied, 'registry entries with no origin')) {
     assert.equal(matchModule(prefix), null, `${prefix} was treated as a proxy target`);
   }
 });

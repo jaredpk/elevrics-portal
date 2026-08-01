@@ -148,6 +148,31 @@ Two conventions are load-bearing:
   and 3.9:1). `--accent-ink` / `--muted-ink` are the darkened values that pass;
   use them anywhere type sits on a wash.
 
+### Quick switch
+
+`⌘K` / `Ctrl+K`, or the search row at the top of the rail, opens a jump-to over
+every destination. It earns its place inside the **proxied modules** most of
+all: deep in SolaYard there is no launcher grid to go back to, and the collapsed
+rail is six unlabelled tiles.
+
+Its list is **read off the rail**, not passed in separately. The rail is already
+rendered from the registry, so reading it back means there is no second copy to
+drift — whatever the server decided is in the nav, including which entry is
+current and which leaves the portal, is exactly what the switcher offers.
+Finance opens in a new tab from here because it does from there.
+
+The button ships `hidden` and `portal.js` reveals it: it does nothing without
+JavaScript, and a control that does nothing is worse than no control. Everything
+else in the rail — links, current page, identity, layout — is server-rendered
+and works either way.
+
+One known limitation: a proxied module could bind `⌘K` itself, and we can't
+detect that. We never take the chord while focus is in a field, and neither of
+the two decorated modules binds it today; if one ever does, the fix is a
+per-module flag in the registry, the same shape as `injectChrome`.
+
+### The rail
+
 The rail auto-collapses to an icon strip and expands on hover **or focus** —
 the focus half is what keeps it usable from the keyboard. Pinning keeps it open
 and reflows the page instead of overlaying, and persists to `localStorage`.

@@ -12,6 +12,11 @@
 > sign-out control: `/cdn-cgi/access/logout` is edge-handled before the Worker
 > runs and cannot be verified locally.
 >
+> Beyond the plan: a `⌘K` quick switcher, which is the navigational half of
+> what Phase 4's ask-box was partly serving and needs no data pipeline to be
+> useful. It reads its destinations off the rail, so the registry stays the one
+> source.
+>
 > Two palette findings surfaced during Phases 1–2 and were deliberately
 > deferred in favour of keeping Elevrics branding as it stands; the
 > measurements are at the top of `public/css/portal.css`. A third — the parked
