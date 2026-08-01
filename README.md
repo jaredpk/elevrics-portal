@@ -20,6 +20,7 @@ onto a path:
 | `/solayard` | `solayard-intel.fly.dev` | `jaredpk/solayard-intel` |
 | `/opportunities` | `elevrics-opportunities.fly.dev` | `jaredpk/elevrics-opportunities` |
 | `/pathfinder` | `elevrics-relocation.fly.dev` | `jaredpk/elevrics-relocation` |
+| Finance (link out) | `finance.elevrics.ai` | `jaredpk/finapp-v3` |
 
 Routing lives in `src/router.js`; `src/index.js` is the Worker entrypoint. The
 Worker runs on **every** request (`assets.run_worker_first`) and hands anything
@@ -49,6 +50,18 @@ can't escape its module.
 
 `/pathfinder` is **passed through whole**: Next.js `basePath` expects to see
 `/pathfinder` in the path and generates correctly prefixed asset URLs on its own.
+
+### Why Finance links out instead of being proxied
+
+`finapp-v3` receives Plaid webhooks, serves an MCP endpoint, and runs its own
+OAuth server (`/.well-known/oauth-authorization-server`, issuer = `APP_URL`).
+None of those callers can present a Cloudflare Access token, so proxying it
+behind the portal would block them — and webhook failures are silent, surfacing
+days later as stale transactions. It also has its own Supabase login, so Access
+would be a second sign-in rather than the sign-in.
+
+It stays on `finance.elevrics.ai` with a launcher card pointing at it. The
+portal is still the single front door; only this one card leaves the origin.
 
 ### Parked hosts
 

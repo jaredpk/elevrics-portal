@@ -162,6 +162,16 @@ a.card:hover {
 .icon-blue   { background: linear-gradient(180deg, #6D8EF8, var(--blue)); }
 .icon-teal   { background: linear-gradient(180deg, #2EC4BD, var(--teal)); }
 .icon-gray   { background: linear-gradient(180deg, #8B93A3, var(--midgray)); }
+.icon-green  { background: linear-gradient(180deg, #34D399, #10B981); }
+
+/* Marks a card that leaves the portal for a host with its own sign-in. */
+.card-external h2::after {
+  content: "↗";
+  margin-left: 7px;
+  font-size: 0.8em;
+  font-weight: 500;
+  color: var(--midgray);
+}
 
 .card h2 {
   margin: 0 0 6px;

@@ -32,6 +32,7 @@
     <li><a href="/solayard">SolaYard Intel</a></li>
     <li><a href="/opportunities">Opportunities</a></li>
     <li><a href="/pathfinder">Pathfinder</a></li>
+    <li><a href="https://finance.elevrics.ai" target="_blank" rel="noopener">Finance ↗</a></li>
     <li><a href="/admin/">Admin</a></li>
   </ul>
 </nav>
@@ -70,6 +71,18 @@
         <p>Relocation screen — 103 locations across 40 factors, with weighting,
            must-have thresholds and per-row confidence bands.</p>
         <div class="card-meta">/pathfinder · Next.js · static dataset</div>
+      </a>
+
+      <!-- Links out rather than proxying. finapp receives Plaid webhooks, serves
+           an MCP endpoint and runs its own OAuth server — none of which can
+           present a Cloudflare Access token, so routing it through the portal
+           would silently break them. It also has its own Supabase login. -->
+      <a class="card card-external" href="https://finance.elevrics.ai" target="_blank" rel="noopener">
+        <div class="card-icon icon-green">FN</div>
+        <h2>Finance</h2>
+        <p>Net worth, accounts, transactions, budgets and cashflow, linked
+           through Plaid.</p>
+        <div class="card-meta">finance.elevrics.ai · separate sign-in</div>
       </a>
 
       <a class="card" href="/admin/">
