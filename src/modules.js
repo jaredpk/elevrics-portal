@@ -18,6 +18,10 @@
  *
  * Key = the routing prefix, and also the path shown in a card's meta line.
  * `href` overrides the link target when the two differ (/admin vs /admin/).
+ *
+ * `status` drives the chip in the rail and on the card. Only a non-`live`
+ * status renders one — chipping everything is noise, and the point of the chip
+ * is that something is NOT yet what it looks like.
  */
 
 export const MODULES = {
@@ -35,6 +39,7 @@ export const MODULES = {
     initials: 'SI',
     accent: 'purple',
     group: 'Modules',
+    status: 'live',
     stack: 'Flask · SQLite',
     blurb:
       'External deadlines and signals the SolaYard roadmap depends on — ' +
@@ -49,6 +54,7 @@ export const MODULES = {
     initials: 'OP',
     accent: 'blue',
     group: 'Modules',
+    status: 'live',
     stack: 'Express · SQLite',
     blurb:
       'Lead-intelligence scanner and review queue. Scores public sources ' +
@@ -64,6 +70,7 @@ export const MODULES = {
     initials: 'PF',
     accent: 'teal',
     group: 'Modules',
+    status: 'live',
     stack: 'Next.js · static dataset',
     blurb:
       'Relocation screen — 103 locations across 40 factors, with weighting, ' +
@@ -77,6 +84,9 @@ export const MODULES = {
     initials: 'AD',
     accent: 'gray',
     group: 'Modules',
+    // Not 'live': the console is inert markup. The chip says so everywhere it
+    // appears, rather than only in the prose on the page itself.
+    status: 'shell',
     stack: 'shell',
     blurb:
       'Cross-tenant console for the client portal. Shell only — there are ' +

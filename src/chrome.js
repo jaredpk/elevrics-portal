@@ -19,7 +19,21 @@
  * append-to-body strategy instead — a different target, but the same renderer.
  */
 
-import { renderNav, renderCards } from './nav.js';
+import { renderRail, renderCards } from './nav.js';
+
+/**
+ * Restores the pinned rail before first paint.
+ *
+ * This has to be inline and in <head>: an external script would still let the
+ * page paint at the collapsed width first and jump. (The concept has this flash
+ * by construction — React can't read localStorage until after hydration, so its
+ * rail starts unpinned every load. Static HTML can just do it right.)
+ */
+const BOOT = `<script>try{if(localStorage.getItem('elv:rail-pinned')==='1')` +
+  `document.documentElement.classList.add('rail-pinned')}catch(e){}</script>`;
+
+/** The pin toggle's click handling — no paint dependency, so it can defer. */
+const BEHAVIOUR = `<script src="/js/portal.js" defer></script>`;
 
 /** Does this response carry markup we can rewrite? */
 function isHtml(response) {
@@ -37,9 +51,15 @@ export function makeChromeInjector(HTMLRewriterCtor) {
     if (!isHtml(response)) return response;
 
     return new HTMLRewriterCtor()
+      .on('head', {
+        element(el) {
+          el.append(BOOT, { html: true });
+          el.append(BEHAVIOUR, { html: true });
+        },
+      })
       .on('[data-portal-nav]', {
         element(el) {
-          el.setInnerContent(renderNav(pathname), { html: true });
+          el.setInnerContent(renderRail(pathname), { html: true });
         },
       })
       .on('[data-portal-cards]', {

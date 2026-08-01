@@ -53,7 +53,9 @@ portal-owned pages served from `public/`; they still appear in the nav, but
 
 Both static pages carry `<nav data-portal-nav>` and (on the launcher)
 `<div class="card-grid" data-portal-cards>` placeholders, which the Worker fills
-via `HTMLRewriter` on the way out. There is no build step to template with, and
+via `HTMLRewriter` on the way out. It also appends two things to `<head>`: an
+inline snippet that restores the pinned rail before first paint, and a deferred
+`/js/portal.js` for the pin toggle. There is no build step to template with, and
 the nav was previously hand-copied into each page — two copies already, and one
 more per page added. `HTMLRewriter` is a Workers global with no Node equivalent,
 so the injector is passed into `handleRequest()` the same way the asset fallback
@@ -62,6 +64,30 @@ the markup itself is tested directly against `src/nav.js`.
 
 Parked hosts are never injected. Their placeholder is public, and it must not
 advertise the internal module list.
+
+### Chrome and design tokens
+
+`public/css/portal.css` opens with the token table — every token has a ROLE, and
+the role is the thing to reason about when something new needs a colour. Values
+stay Elevrics; only the discipline is borrowed from the insights-portal concept
+(see `docs/portal-redesign-plan.md`).
+
+Two conventions are load-bearing:
+
+- **Module accents are identity, not palette.** Each module's initials tile
+  carries the same colour in the rail and on its launcher card, because the
+  collapsed rail has nothing else to identify a destination by. Don't reuse
+  purple/blue/teal/gray to mean anything.
+- **Text on a wash gets its own token.** `--accent` and `--muted` both pass
+  contrast on white and both fail on their own 10–16% tint at chip size (2.9:1
+  and 3.9:1). `--accent-ink` / `--muted-ink` are the darkened values that pass;
+  use them anywhere type sits on a wash.
+
+The rail auto-collapses to an icon strip and expands on hover **or focus** —
+the focus half is what keeps it usable from the keyboard. Pinning keeps it open
+and reflows the page instead of overlaying, and persists to `localStorage`.
+Below 860px it becomes a horizontal pill scroller rather than a hamburger:
+nothing hides behind a menu at four modules.
 
 ### Two proxying modes
 

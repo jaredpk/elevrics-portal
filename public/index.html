@@ -14,15 +14,20 @@
 
 <!-- Filled by the Worker from the registry in src/modules.js. Don't hand-write
      nav links here: there are two pages carrying this and they drifted. -->
-<nav data-portal-nav></nav>
+<nav class="rail" aria-label="Portal" data-portal-nav></nav>
+
+<header class="hero">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">Elevrics Internal</p>
+    <div class="hero-rule"></div>
+    <h1>Portal</h1>
+    <p class="hero-sub">Internal tools, one login. Authentication is handled by
+       Cloudflare Access at the edge — every module below verifies the same
+       token independently.</p>
+  </div>
+</header>
 
 <main>
-
-  <div class="page-head">
-    <h1>Portal</h1>
-    <p>Internal tools, one login. Authentication is handled by Cloudflare Access
-       at the edge — every module below verifies the same token independently.</p>
-  </div>
 
   <section class="section">
     <p class="section-label">Modules</p>

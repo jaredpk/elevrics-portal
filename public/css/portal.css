@@ -1,124 +1,341 @@
 /* Elevrics Portal — internal shell.
-   Tokens mirror elevrics-site/css/styles.css so the portal reads as the same
-   product as the marketing site. Light theme, navy chrome, white cards. */
+   ==========================================================================
+
+   Every token below has a ROLE, and the role is the thing to reason about when
+   something new needs a colour. Values stay Elevrics (they mirror
+   elevrics-site/css/styles.css); only the discipline is borrowed.
+
+     ROLE            TOKEN            USED FOR
+     ground          --navy           brand ground, headings
+     ground (deep)   --navy-deep      the hero band behind reversed type
+     accent          --accent         rules, active state, chips. The teal end
+                                      of the logo's purple→blue→teal ramp — the
+                                      brightest of the three, so it reads as
+                                      emphasis rather than as a fourth colour
+     paper           --paper          page background
+     surface         --white          cards, the rail
+     line            --line           borders and dividers
+     ink / muted     --ink --muted    body copy, secondary copy
+     display tier    .display-type    uppercase + tracked Inter 600. A tier, not
+                                      a font — nav labels, eyebrows, hero titles
+     mono tier       --font-mono      provenance and status metadata only
+
+   The three module accents (purple/blue/teal/gray) are IDENTITY, not palette:
+   each module's tile carries the same colour in the rail and on its launcher
+   card, so the two name things the same way. Don't reuse them for meaning.
+   ========================================================================== */
 
 :root {
   --navy:      #071833;
-  --purple:    #7B2CBF;
-  --teal:      #00A19A;
-  --blue:      #3C6FF0;
-  --offwhite:  #F7F8FB;
-  --lightgray: #D3D7E0;
-  --midgray:   #6C7383;
-  --charcoal:  #22222A;
-  --white:     #FFFFFF;
+  --navy-deep: #050F22;
+
+  --accent:      #00A19A;
+  --accent-wash: rgba(0, 161, 154, 0.10);
+
+  /* Text sitting ON a wash needs its own value. The accent and the muted grey
+     are both fine on white and both fail WCAG AA on their own tint at chip size
+     (2.9:1 and 3.9:1) — these are the darkened versions that pass. */
+  --accent-ink: #00706B;
+  --muted-ink:  #565C6B;
+
+  --paper: #F7F8FB;
+  --white: #FFFFFF;
+  --line:  #D3D7E0;
+  --ink:   #22222A;
+  --muted: #6C7383;
+
+  /* Module identity */
+  --purple: #7B2CBF;
+  --blue:   #3C6FF0;
+  --teal:   #00A19A;
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* The rail reserves the collapsed width and widens OVER the content on
+     hover; pinning reflows the page to the open width instead. */
+  --rail-collapsed: 64px;
+  --rail-open: 272px;
+
+  --ease: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  font-family: 'Inter', sans-serif;
-  background: var(--offwhite);
-  color: var(--charcoal);
+  padding-left: var(--rail-collapsed);
+  font-family: var(--font-sans);
+  background: var(--paper);
+  color: var(--ink);
   line-height: 1.6;
+  transition: padding-left var(--ease);
 }
 
-/* ---------- Nav ---------- */
+html.rail-pinned body { padding-left: var(--rail-open); }
 
-nav {
-  position: sticky;
-  top: 0;
+/* The display tier: a treatment, not a typeface. */
+.display-type,
+.hero h1,
+.hero-eyebrow,
+.rail-label,
+.rail-brand-tag,
+.section-label {
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-weight: 600;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------- Rail ----------
+   Collapsed it is an icon strip; hovering — or tabbing into it, which is the
+   half that's easy to forget — widens it over the content. Pinning persists
+   (see public/js/portal.js) and reflows instead of overlaying. */
+
+.rail {
+  position: fixed;
+  inset-block: 0;
+  left: 0;
   z-index: 100;
-  background: var(--navy);
+  width: var(--rail-collapsed);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 14px 32px;
+  flex-direction: column;
+  overflow: hidden;
+  white-space: nowrap;
+  background: var(--white);
+  border-right: 1px solid var(--line);
+  transition: width var(--ease), box-shadow var(--ease);
 }
 
-.nav-logo {
+.rail:hover,
+.rail:focus-within,
+html.rail-pinned .rail {
+  width: var(--rail-open);
+  box-shadow: 0 8px 40px rgba(7, 24, 51, 0.10);
+}
+
+html.rail-pinned .rail { box-shadow: none; }
+
+.rail-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  min-height: 65px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
   text-decoration: none;
 }
 
-.nav-logo-text {
-  color: var(--white);
+.rail-mark { flex: none; }
+
+.rail-brand-text,
+.rail-label,
+.rail .chip,
+.rail-pin {
+  display: none;
+}
+
+.rail:hover .rail-brand-text,
+.rail:focus-within .rail-brand-text,
+html.rail-pinned .rail-brand-text {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.rail:hover .rail-label,
+.rail:focus-within .rail-label,
+html.rail-pinned .rail-label,
+.rail:hover .chip,
+.rail:focus-within .chip,
+html.rail-pinned .rail .chip {
+  display: inline-block;
+}
+
+.rail:hover .rail-pin,
+.rail:focus-within .rail-pin,
+html.rail-pinned .rail-pin {
+  display: flex;
+}
+
+.rail-brand-name {
+  color: var(--navy);
   font-weight: 600;
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   letter-spacing: -0.01em;
 }
 
-.nav-tag {
-  color: var(--lightgray);
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding-left: 10px;
-  margin-left: 2px;
-  border-left: 1px solid rgba(255, 255, 255, 0.2);
+.rail-brand-tag {
+  color: var(--muted);
+  font-size: 0.66rem;
+  padding-left: 9px;
+  border-left: 1px solid var(--line);
 }
 
-.nav-links {
-  display: flex;
+.rail-pin {
+  position: absolute;
+  top: 19px;
+  right: 14px;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background var(--ease), color var(--ease);
+}
+
+.rail-pin:hover { background: var(--paper); color: var(--navy); }
+.rail-pin svg { width: 15px; height: 15px; transform: rotate(180deg); }
+html.rail-pinned .rail-pin svg { transform: none; }
+
+.rail-links {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 12px 12px 24px;
 }
 
-.nav-links a {
-  display: block;
-  padding: 7px 14px;
-  border-radius: 8px;
-  color: var(--lightgray);
-  font-size: 0.9rem;
+.rail-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  margin-bottom: 2px;
+  border-radius: 9px;
+  border-left: 2px solid transparent;
   text-decoration: none;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--ease);
 }
 
-.nav-links a:hover { background: rgba(255, 255, 255, 0.08); color: var(--white); }
-.nav-links a[aria-current='page'] { background: rgba(255, 255, 255, 0.14); color: var(--white); }
+.rail-link:hover { background: rgba(7, 24, 51, 0.04); }
+
+.rail-link[aria-current='page'] {
+  background: var(--accent-wash);
+  border-left-color: var(--accent);
+}
+
+/* The collapsed rail's only wayfinding — same initials and accent as the
+   module's launcher card, so the two agree. */
+.rail-tile {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--white);
+}
+
+.rail-tile-home {
+  background: rgba(7, 24, 51, 0.06);
+  color: var(--navy);
+}
+
+.rail-tile-home svg { width: 17px; height: 17px; }
+
+.rail-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.82rem;
+  color: var(--navy);
+}
+
+/* ---------- Hero band ----------
+   Reversed type on deep navy. The rail already carries the mark, so this
+   doesn't repeat it — at four modules that reads as redundancy, not branding. */
+
+.hero {
+  background: var(--navy-deep);
+  padding: 52px 40px 46px;
+}
+
+.hero-inner { max-width: 1040px; margin: 0 auto; }
+
+.hero-eyebrow {
+  margin: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.22em;
+  color: var(--accent);
+}
+
+.hero-rule {
+  height: 3px;
+  width: 52px;
+  background: var(--accent);
+  margin: 22px 0 18px;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 2.5rem;
+  line-height: 1.02;
+  color: var(--white);
+  letter-spacing: 0.03em;
+}
+
+.hero h1 .chip { vertical-align: middle; margin-left: 12px; }
+
+.hero-sub {
+  margin: 14px 0 0;
+  max-width: 62ch;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.95rem;
+}
 
 /* ---------- Layout ---------- */
 
 main {
   max-width: 1040px;
   margin: 0 auto;
-  padding: 56px 32px 80px;
-}
-
-.page-head { margin-bottom: 40px; }
-
-.page-head h1 {
-  margin: 0 0 8px;
-  font-size: 2rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--navy);
-}
-
-.page-head p {
-  margin: 0;
-  max-width: 60ch;
-  color: var(--midgray);
+  padding: 44px 40px 80px;
 }
 
 .section-label {
   margin: 0 0 16px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--midgray);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  color: var(--muted);
 }
 
 .section + .section { margin-top: 48px; }
+
+/* ---------- Chips ----------
+   Only a NON-live status gets one. The point of a chip is that something is not
+   yet what it looks like; chipping everything just adds noise. */
+
+.chip {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+}
+
+.chip-shell { background: rgba(108, 115, 131, 0.16); color: var(--muted-ink); }
+.chip-soon,
+.chip-beta { background: var(--accent-wash); color: var(--accent-ink); }
+.hero .chip-shell { background: rgba(255, 255, 255, 0.14); color: rgba(255, 255, 255, 0.75); }
 
 /* ---------- Module cards ---------- */
 
@@ -132,17 +349,25 @@ main {
   display: flex;
   flex-direction: column;
   background: var(--white);
-  border: 1px solid var(--lightgray);
+  border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 28px;
+  padding: 26px;
   text-decoration: none;
   color: inherit;
-  transition: box-shadow 0.2s, transform 0.2s;
+  transition: box-shadow var(--ease), transform var(--ease);
 }
 
 a.card:hover {
   box-shadow: 0 6px 28px rgba(7, 24, 51, 0.08);
   transform: translateY(-2px);
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .card-icon {
@@ -152,7 +377,6 @@ a.card:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 18px;
   font-size: 1.1rem;
   font-weight: 600;
   color: var(--white);
@@ -161,7 +385,7 @@ a.card:hover {
 .icon-purple { background: linear-gradient(180deg, #9B5CF6, var(--purple)); }
 .icon-blue   { background: linear-gradient(180deg, #6D8EF8, var(--blue)); }
 .icon-teal   { background: linear-gradient(180deg, #2EC4BD, var(--teal)); }
-.icon-gray   { background: linear-gradient(180deg, #8B93A3, var(--midgray)); }
+.icon-gray   { background: linear-gradient(180deg, #8B93A3, var(--muted)); }
 
 .card h2 {
   margin: 0 0 6px;
@@ -174,23 +398,23 @@ a.card:hover {
 .card p {
   margin: 0;
   font-size: 0.92rem;
-  color: var(--midgray);
+  color: var(--muted);
 }
 
 .card-meta {
   margin-top: 18px;
   padding-top: 14px;
-  border-top: 1px solid var(--offwhite);
+  border-top: 1px solid var(--paper);
   font-size: 0.78rem;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  color: var(--midgray);
+  font-family: var(--font-mono);
+  color: var(--muted);
 }
 
 /* ---------- Empty / placeholder states ---------- */
 
 .empty {
   background: var(--white);
-  border: 1px dashed var(--lightgray);
+  border: 1px dashed var(--line);
   border-radius: 14px;
   padding: 40px 32px;
   text-align: center;
@@ -207,21 +431,7 @@ a.card:hover {
   margin: 0 auto;
   max-width: 52ch;
   font-size: 0.92rem;
-  color: var(--midgray);
-}
-
-.badge {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: rgba(123, 44, 191, 0.1);
-  color: var(--purple);
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  vertical-align: middle;
-  margin-left: 10px;
+  color: var(--muted);
 }
 
 /* ---------- Roadmap list ---------- */
@@ -231,7 +441,7 @@ a.card:hover {
   padding: 0;
   list-style: none;
   background: var(--white);
-  border: 1px solid var(--lightgray);
+  border: 1px solid var(--line);
   border-radius: 14px;
   overflow: hidden;
 }
@@ -243,15 +453,15 @@ a.card:hover {
   font-size: 0.92rem;
 }
 
-.steps li + li { border-top: 1px solid var(--offwhite); }
+.steps li + li { border-top: 1px solid var(--paper); }
 
 .steps .step-n {
   flex: none;
   width: 24px;
   height: 24px;
   border-radius: 6px;
-  background: var(--offwhite);
-  color: var(--midgray);
+  background: var(--paper);
+  color: var(--muted);
   font-size: 0.78rem;
   font-weight: 600;
   display: flex;
@@ -260,19 +470,92 @@ a.card:hover {
 }
 
 .steps strong { color: var(--navy); font-weight: 600; }
-.steps span.detail { color: var(--midgray); }
+.steps span.detail { color: var(--muted); }
 
 footer {
-  border-top: 1px solid var(--lightgray);
-  padding: 24px 32px;
+  border-top: 1px solid var(--line);
+  padding: 24px 40px;
   text-align: center;
   font-size: 0.82rem;
-  color: var(--midgray);
+  color: var(--muted);
 }
 
-@media (max-width: 640px) {
-  nav { padding: 12px 18px; flex-wrap: wrap; }
-  .nav-tag { display: none; }
-  main { padding: 36px 18px 56px; }
-  .page-head h1 { font-size: 1.6rem; }
+/* ---------- Mobile ----------
+   A horizontal pill scroller, not a hamburger: every destination stays visible
+   and one tap away. Nothing hides behind a menu at four modules. */
+
+@media (max-width: 860px) {
+  body { padding-left: 0; }
+  html.rail-pinned body { padding-left: 0; }
+
+  .rail,
+  .rail:hover,
+  .rail:focus-within,
+  html.rail-pinned .rail {
+    position: static;
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 10px 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    box-shadow: none;
+  }
+
+  .rail-brand {
+    min-height: 0;
+    padding: 0 10px 0 0;
+    border-bottom: 0;
+    border-right: 1px solid var(--line);
+    align-self: stretch;
+  }
+
+  .rail-brand-text { display: none !important; }
+  .rail-pin { display: none !important; }
+
+  .rail-links {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .rail-label { display: inline-block; }
+
+  .rail-link {
+    gap: 8px;
+    padding: 5px 12px 5px 6px;
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+  }
+
+  .rail-link[aria-current='page'] {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+  }
+
+  .rail-tile { width: 24px; height: 24px; border-radius: 6px; font-size: 0.66rem; }
+  .rail-tile-home svg { width: 13px; height: 13px; }
+  .rail .chip { display: none !important; }
+
+  .hero { padding: 34px 20px 30px; }
+  .hero h1 { font-size: 1.85rem; }
+  main { padding: 32px 20px 56px; }
+  footer { padding: 24px 20px; }
+}
+
+/* Respect a stated preference for less movement — the rail's width animation
+   is the main offender, and it is decorative. */
+@media (prefers-reduced-motion: reduce) {
+  body,
+  .rail,
+  .rail-link,
+  .rail-pin,
+  .card {
+    transition: none;
+  }
 }

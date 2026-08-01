@@ -32,7 +32,7 @@ function esc(value) {
  * injected into pages we don't own, where a bare `n1` could collide with an
  * existing def and silently repaint someone else's icon.
  */
-const LOGO = `<svg width="24" height="20" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+const LOGO = `<svg class="rail-mark" width="24" height="20" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <defs>
     <linearGradient id="elv-n1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9B5CF6"/><stop offset="100%" stop-color="#7B2CBF"/></linearGradient>
     <linearGradient id="elv-n2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6D8EF8"/><stop offset="100%" stop-color="#3C6FF0"/></linearGradient>
@@ -43,26 +43,63 @@ const LOGO = `<svg width="24" height="20" viewBox="0 0 24 20" fill="none" xmlns=
   <rect x="18" y="0" width="6" height="20" rx="2" fill="url(#elv-n3)"/>
 </svg>`;
 
+/** Home's marker. Modules get their initials tile; the launcher gets a glyph. */
+const HOME_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+  <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+</svg>`;
+
+/** Chevrons: point left to collapse when pinned, right to open when not. */
+const PIN_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/>
+</svg>`;
+
+/** A status chip, or nothing at all when the thing is simply live. */
+function chip(status) {
+  if (!status || status === 'live') return '';
+  const label = { shell: 'Shell', soon: 'Soon', beta: 'Beta' }[status] ?? status;
+  return `<span class="chip chip-${esc(status)}">${esc(label)}</span>`;
+}
+
 /**
- * The nav bar's contents for a given path. Returns the inner markup of <nav>,
- * not the element itself — the page owns the landmark, the registry owns what
- * goes in it.
+ * The rail's contents for a given path. Returns the inner markup of <nav>, not
+ * the element itself — the page owns the landmark, the registry owns what goes
+ * in it.
+ *
+ * Collapsed, the tiles alone identify each destination, which is why they use
+ * the same initials and accent as that module's launcher card: the rail and the
+ * grid name things the same way.
  */
-export function renderNav(pathname) {
+export function renderRail(pathname) {
   const links = entries()
     .map(([prefix, entry]) => {
-      const current = isCurrent(prefix, pathname) ? ' aria-current="page"' : '';
-      return `<li><a href="${esc(hrefFor(prefix))}"${current}>${esc(entry.label)}</a></li>`;
+      const current = isCurrent(prefix, pathname);
+      const marker =
+        prefix === '/'
+          ? `<span class="rail-tile rail-tile-home">${HOME_GLYPH}</span>`
+          : `<span class="rail-tile icon-${esc(entry.accent)}">${esc(entry.initials)}</span>`;
+      return `<li>
+        <a class="rail-link" href="${esc(hrefFor(prefix))}"${current ? ' aria-current="page"' : ''}>
+          ${marker}
+          <span class="rail-label">${esc(entry.label)}</span>
+          ${chip(entry.status)}
+        </a>
+      </li>`;
     })
-    .join('\n    ');
+    .join('\n      ');
 
-  return `<a href="/" class="nav-logo">
+  return `<a class="rail-brand" href="/">
     ${LOGO}
-    <span class="nav-logo-text">Elevrics</span>
-    <span class="nav-tag">Portal</span>
+    <span class="rail-brand-text">
+      <span class="rail-brand-name">Elevrics</span>
+      <span class="rail-brand-tag">Portal</span>
+    </span>
   </a>
-  <ul class="nav-links">
-    ${links}
+  <button type="button" class="rail-pin" data-rail-pin aria-pressed="false" aria-label="Keep sidebar open">
+    ${PIN_GLYPH}
+  </button>
+  <ul class="rail-links">
+      ${links}
   </ul>`;
 }
 
@@ -76,7 +113,10 @@ export function renderCards(group = 'Modules') {
     .map(([prefix, entry]) => {
       const meta = `${prefix} · ${entry.stack}`;
       return `<a class="card" href="${esc(hrefFor(prefix))}">
-        <div class="card-icon icon-${esc(entry.accent)}">${esc(entry.initials)}</div>
+        <div class="card-head">
+          <div class="card-icon icon-${esc(entry.accent)}">${esc(entry.initials)}</div>
+          ${chip(entry.status)}
+        </div>
         <h2>${esc(entry.label)}</h2>
         <p>${esc(entry.blurb)}</p>
         <div class="card-meta">${esc(meta)}</div>
