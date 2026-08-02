@@ -245,6 +245,36 @@ test('the identity is escaped like everything else', () => {
   assert.match(html, /&lt;img/);
 });
 
+test('a portal account gets a sign-out control; the Access header does not', () => {
+  // Both shapes are live at once for the length of the rollout — the string is
+  // the Cloudflare Access header, the object is a portal session. Only the
+  // latter has anything to sign out OF.
+  const account = renderRail('/', { email: 'jared@elevrics.ai', signOut: true });
+  assert.match(account, /elv-rail-viewer-email[^>]*>jared@elevrics\.ai</);
+  assert.match(account, /<form class="elv-rail-signout" method="POST" action="\/auth\/logout">/);
+
+  assert.doesNotMatch(renderRail('/', 'jared@elevrics.ai'), /elv-rail-signout/);
+});
+
+test('sign-out is a POST form, never a link', () => {
+  // A GET sign-out fires from any <img> on any page and gets triggered
+  // speculatively by link prefetchers. Being signed out by a page you merely
+  // looked at is a real bug, not a theoretical one.
+  const html = renderRail('/', { email: 'jared@elevrics.ai', signOut: true });
+  assert.doesNotMatch(html, /<a[^>]+href="\/auth\/logout"/);
+  assert.match(html, /<button type="submit"[^>]*aria-label="Sign out"/);
+});
+
+test('impersonation does not look like an ordinary session', () => {
+  const html = renderRail('/', {
+    email: 'someone@client.example',
+    signOut: true,
+    impersonator: 'jared@elevrics.ai',
+  });
+  assert.match(html, /elv-rail-impersonating[^>]*>Viewing as</);
+  assert.doesNotMatch(html, />Signed in</);
+});
+
 test('a coming-soon module is chipped "Soon", not its raw status', () => {
   // The status value and the chip wording are separate: `coming_soon` is what
   // the router matches on, and it is too wide for the rail — rendering it raw

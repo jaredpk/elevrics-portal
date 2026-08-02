@@ -1,28 +1,53 @@
 /**
  * Portal router.
  *
+ * WHO DECIDES WHETHER A REQUEST IS ALLOWED is in the middle of changing, and
+ * this file is where the transition is expressed. It used to be one sentence:
  * portal.elevrics.ai sits behind ONE Cloudflare Access application, so every
- * request that reaches this router is already authenticated. The
- * Cf-Access-Jwt-Assertion header rides along to each origin unchanged, because
- * the origins must verify it themselves: the Fly hostnames stay publicly
- * reachable, and a direct hit on *.fly.dev has to be rejected there, not here.
- * This router is a convenience layer, not a security boundary.
+ * request that reaches this router is already authenticated, and
+ * Cf-Access-Jwt-Assertion rides along to each origin unchanged because the
+ * origins verify it themselves — the Fly hostnames stay publicly reachable, so a
+ * direct hit on *.fly.dev has to be rejected there, not here.
+ *
+ * That last property is not changing. What changes is who issues the token the
+ * origins verify: the portal now runs its own accounts (WorkOS AuthKit, see
+ * src/auth/) and mints its own short-lived assertion. `AUTH_MODE` selects which
+ * state we are in — 'access' (as before), 'shadow' (portal sessions exist
+ * alongside Access), 'enforce' (portal session required, Access removable). See
+ * src/auth/config.js; the ordering constraint is written out there.
+ *
+ * In 'enforce' mode this router IS a security boundary for the portal hostname.
+ * It is still not the only one, and must not become the only one: every origin
+ * keeps verifying for itself, because *.fly.dev is still reachable directly.
  *
  * Anything that doesn't match a module prefix falls through to the static
  * shell (launcher at /, admin console at /admin).
  *
- * Transport-agnostic on purpose: handleRequest() takes the asset fallback and
- * the chrome injector as parameters, so the Worker passes env.ASSETS.fetch and
- * an HTMLRewriter-backed injector while the local integration harness passes a
- * stub and nothing. The routing logic under test is the deployed logic.
+ * Transport-agnostic on purpose: handleRequest() takes the asset fallback, the
+ * chrome injector and the env as parameters, so the Worker passes
+ * env.ASSETS.fetch and an HTMLRewriter-backed injector while the local
+ * integration harness passes a stub and nothing. The routing logic under test is
+ * the deployed logic.
  *
  * What the portal CONTAINS lives in modules.js — one registry behind the
  * proxying here, the nav, and the launcher grid.
  */
 
-import { MODULES, matchComingSoon } from './modules.js';
+import { MODULES, matchComingSoon, requiredRoleFor } from './modules.js';
 import { isDocumentRequest, viewerFor } from './chrome.js';
 import { renderComingSoon } from './nav.js';
+import { matchRetiredHost, handleRetiredHost, retirementMode } from './retired.js';
+import { authConfig } from './auth/config.js';
+import { handleAuthRoute } from './auth/routes.js';
+import { readSession, withCookies } from './auth/session.js';
+import { gate, isPublicPath } from './auth/guard.js';
+import {
+  mintAssertion,
+  stripInboundAssertions,
+  jwksResponse,
+  JWKS_PATH,
+  ASSERTION_HEADER,
+} from './auth/assertion.js';
 
 export { MODULES };
 
@@ -109,15 +134,21 @@ export function reprefixCookiePath(cookie, prefix) {
  * @param injectChrome  optional (response, {pathname, mode, viewer}) => Response
  *   that renders the rail into the page. Omitted outside the Workers runtime,
  *   where HTMLRewriter doesn't exist; the router routes identically either way.
+ * @param env  the Worker environment — auth secrets, bindings, mode flags.
+ *   Defaulted so the existing unit tests and the local harness, which care about
+ *   routing and not about auth, keep calling this with three arguments.
  */
-export async function handleRequest(request, serveAssets, injectChrome) {
+export async function handleRequest(request, serveAssets, injectChrome, env = {}) {
   const url = new URL(request.url);
-  // Set by Cloudflare Access on everything it lets through. Display only — it
-  // names the signed-in viewer in the rail and gates nothing.
-  const viewer = viewerFor(request);
+  const config = authConfig(env);
 
-  // Parked hosts are checked before anything path-based, so no request on a
-  // public hostname can reach a module.
+  // ---- Host-level routing, before anything path-based ----
+  //
+  // Both checks below are host checks for the same reason: a request on a
+  // hostname that is not the portal must never be able to reach a module,
+  // whatever path it asks for.
+
+  // A parked host is a name we hold and have not used.
   // Deliberately never injected with portal chrome: a parked host is public,
   // and its placeholder must not advertise the internal module list.
   const parked = matchParkedHost(url.hostname);
@@ -131,7 +162,47 @@ export async function handleRequest(request, serveAssets, injectChrome) {
     return new Response(response.body, { ...response, headers });
   }
 
+  // A retired host is a name that WAS used and whose URLs must keep resolving.
+  // Answered without any session check: being made to sign in before being told
+  // where something moved is hostile, and a redirect discloses nothing that the
+  // hostname itself didn't already.
+  const retired = matchRetiredHost(url.hostname);
+  if (retired) {
+    return handleRetiredHost(retired, url, serveAssets, {
+      mode: retirementMode(env),
+      portalOrigin: config.portalOrigin,
+    });
+  }
+
+  // ---- Auth ----
+
+  // Public key material, fetched by module origins as machines. Ahead of the
+  // session read because it has nothing to do with sessions.
+  if (url.pathname === JWKS_PATH) return jwksResponse(config, env);
+
+  const authResponse = await handleAuthRoute(request, url, config);
+  if (authResponse) return authResponse;
+
+  // May mint cookies (a refreshed session) or clear them (a dead one), and
+  // those have to reach whatever response we end up returning — hence
+  // `withCookies` on every exit below rather than a mutation here.
+  const { session, cookies } = await readSession(request, config);
+
+  // The portal's own account wins; the Access header remains the fallback for
+  // as long as Access is still in front. One line, and it is what lets 'shadow'
+  // mode show a real portal identity in the rail before anything depends on it.
+  const viewer = session
+    ? { email: session.email, name: session.name, signOut: true, impersonator: session.impersonator }
+    : viewerFor(request);
+
   const match = matchModule(url.pathname);
+
+  const denied = gate(request, url, session, {
+    config,
+    requiredRole: requiredRoleFor(url.pathname),
+  });
+  if (denied) return withCookies(denied, cookies);
+
   if (!match) {
     // A module that is listed but not built yet gets a branded page rather
     // than a 404, so the "Soon" chip in the rail leads somewhere deliberate.
@@ -143,15 +214,25 @@ export async function handleRequest(request, serveAssets, injectChrome) {
       : await serveAssets(request);
 
     // Either way it is one of the portal's own pages: fill the placeholders.
-    return injectChrome
-      ? injectChrome(response, { pathname: url.pathname, mode: 'placeholder', viewer })
-      : response;
+    //
+    // Except the public ones. The rail enumerates every internal module by
+    // name, and /signed-out/ is the one portal page an unauthenticated visitor
+    // is meant to reach — decorating it would hand the module list to exactly
+    // the person the sign-in exists to stop. (It also spares those pages the
+    // body inset that clears a fixed rail they don't have.)
+    return withCookies(
+      injectChrome && !isPublicPath(url.pathname)
+        ? injectChrome(response, { pathname: url.pathname, mode: 'placeholder', viewer })
+        : response,
+      cookies,
+    );
   }
 
-  const { prefix, config } = match;
+  // `mod`, not `config` — `config` is the auth configuration in this scope now.
+  const { prefix, config: mod } = match;
 
-  const upstream = new URL(config.origin);
-  if (config.stripPrefix) {
+  const upstream = new URL(mod.origin);
+  if (mod.stripPrefix) {
     const rest = url.pathname.slice(prefix.length);
     upstream.pathname = rest === '' ? '/' : rest;
   } else {
@@ -160,9 +241,24 @@ export async function handleRequest(request, serveAssets, injectChrome) {
   upstream.search = url.search;
 
   const proxied = new Request(upstream, request);
+
+  // BEFORE anything is added: delete every X-Elevrics-* header the CLIENT sent.
+  // Without this the assertion below is decorative — a caller could present its
+  // own (or a captured) token to portal.elevrics.ai and have the router forward
+  // it verbatim to a module that has been taught to trust exactly that header.
+  stripInboundAssertions(proxied.headers);
+
   proxied.headers.set('X-Forwarded-Host', url.host);
   proxied.headers.set('X-Forwarded-Proto', 'https');
-  if (config.stripPrefix) proxied.headers.set('X-Forwarded-Prefix', prefix);
+  if (mod.stripPrefix) proxied.headers.set('X-Forwarded-Prefix', prefix);
+
+  // The portal's own identity assertion: signed, 2 minutes, audience-bound to
+  // this module. This is what an origin verifies once it stops verifying the
+  // Cloudflare Access token — see src/auth/assertion.js. Absent until a signing
+  // key is configured, which is what makes the rollout incremental: origins can
+  // start accepting it while Access is still the thing being enforced.
+  const assertion = await mintAssertion(config, session, prefix);
+  if (assertion) proxied.headers.set(ASSERTION_HEADER, assertion);
 
   // Manual redirect handling so we can rewrite Location into portal space
   // rather than bouncing the browser to the bare fly.dev origin.
@@ -173,24 +269,27 @@ export async function handleRequest(request, serveAssets, injectChrome) {
   // top-level page load — see isDocumentRequest for why a fragment must not
   // receive a navigation rail.
   const decorate = (res) =>
-    injectChrome && config.injectChrome && isDocumentRequest(request)
-      ? injectChrome(res, { pathname: url.pathname, mode: 'standalone', viewer })
-      : res;
+    withCookies(
+      injectChrome && mod.injectChrome && isDocumentRequest(request)
+        ? injectChrome(res, { pathname: url.pathname, mode: 'standalone', viewer })
+        : res,
+      cookies,
+    );
 
-  if (!config.stripPrefix) return decorate(response);
+  if (!mod.stripPrefix) return decorate(response);
 
   const rewritten = new Response(response.body, response);
 
   const location = rewritten.headers.get('Location');
   if (location) {
-    rewritten.headers.set('Location', reprefixLocation(location, config.origin, prefix));
+    rewritten.headers.set('Location', reprefixLocation(location, mod.origin, prefix));
   }
 
-  const cookies = rewritten.headers.getSetCookie?.() ?? [];
-  if (cookies.length) {
+  const moduleCookies = rewritten.headers.getSetCookie?.() ?? [];
+  if (moduleCookies.length) {
     rewritten.headers.delete('Set-Cookie');
-    for (const cookie of cookies) {
-      rewritten.headers.append('Set-Cookie', reprefixCookiePath(cookie, prefix));
+    for (const value of moduleCookies) {
+      rewritten.headers.append('Set-Cookie', reprefixCookiePath(value, prefix));
     }
   }
 

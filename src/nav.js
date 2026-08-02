@@ -71,29 +71,59 @@ const EXTERNAL_MARK =
   '<span class="elv-ext-mark" aria-hidden="true">\u2197</span>' +
   '<span class="elv-sr-only"> (opens in a new tab)</span>';
 
+/** Door-with-an-arrow. Sign out is the one destructive control in the rail. */
+const SIGNOUT_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M15 17l5-5-5-5"/><path d="M20 12H9"/><path d="M12 19H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6"/>
+</svg>`;
+
 /**
  * Who is signed in, at the foot of the rail.
  *
- * Cloudflare Access puts the verified identity on every request that reaches
- * the Worker, so the portal can finally SHOW its auth story instead of
- * asserting it in prose — including on the proxied modules, where the header
- * was already being forwarded and nothing displayed it.
+ * Takes either a bare email string (the Cloudflare Access header, which is all
+ * there was) or `{ email, name, signOut, impersonator }` for a portal account.
+ * Both shapes, rather than a migration, because both are live at once for the
+ * length of the 'shadow' rollout — see src/auth/config.js.
  *
- * Display only. This must never gate anything: the README is emphatic that the
- * router is a convenience layer and each origin verifies the token itself, and
- * a header that decides what you can see would quietly contradict that.
- * Rendered through esc() like everything else, so a spoofed value on some
- * hypothetical un-gated path can only mislead the person who sent it.
+ * The Access header remains DISPLAY ONLY and must never gate anything: the
+ * router is a convenience layer for as long as Access is the thing enforcing,
+ * and a header that decided what you can see would quietly contradict that.
+ * A portal session is different — it is verified server-side before this markup
+ * is ever produced — but the rail still only renders it, and everything goes
+ * through esc() regardless.
  */
 function viewerFoot(viewer) {
   if (!viewer) return '';
-  const initial = viewer.trim().charAt(0).toUpperCase() || '?';
+  const { email, signOut = false, impersonator = null } =
+    typeof viewer === 'string' ? { email: viewer } : viewer;
+  if (!email) return '';
+
+  const initial = email.trim().charAt(0).toUpperCase() || '?';
+
+  // Sign-out is a POST, so it is a <form> rather than a link. A GET sign-out
+  // fires from any <img> on any page and gets triggered speculatively by link
+  // prefetchers; being signed out by a page you merely looked at is a real bug.
+  // With SameSite=Lax on the session cookie, POST-only is also the CSRF defence.
+  const signOutControl = signOut
+    ? `<form class="elv-rail-signout" method="POST" action="/auth/logout">
+      <button type="submit" title="Sign out" aria-label="Sign out">
+        ${SIGNOUT_GLYPH}
+      </button>
+    </form>`
+    : '';
+
+  // An admin browsing as someone else must never look identical to that person
+  // being signed in. Loud on purpose.
+  const banner = impersonator
+    ? `<span class="elv-rail-impersonating" title="Impersonated by ${esc(impersonator)}">Viewing as</span>`
+    : '';
+
   return `<div class="elv-rail-foot">
     <span class="elv-rail-avatar" aria-hidden="true">${esc(initial)}</span>
     <span class="elv-rail-viewer">
-      <span class="elv-rail-viewer-label">Signed in</span>
-      <span class="elv-rail-viewer-email" title="${esc(viewer)}">${esc(viewer)}</span>
+      <span class="elv-rail-viewer-label">${banner || 'Signed in'}</span>
+      <span class="elv-rail-viewer-email" title="${esc(email)}">${esc(email)}</span>
     </span>
+    ${signOutControl}
   </div>`;
 }
 
@@ -239,13 +269,13 @@ export function renderComingSoon(prefix, entry) {
     <div class="empty">
       <h2>This module is on the way</h2>
       <p>It will appear at <code>${esc(prefix)}</code> with the same chrome as
-         the rest of the portal, behind the same Cloudflare Access application.
-         Nothing is deployed here yet.</p>
+         the rest of the portal, behind the same sign-in. Nothing is deployed
+         here yet.</p>
     </div>
   </section>
 </main>
 
-<footer>Elevrics internal · not indexed · access controlled by Cloudflare Access</footer>
+<footer>Elevrics internal · not indexed · sign-in required</footer>
 
 </body>
 </html>`;

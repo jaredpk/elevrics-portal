@@ -28,6 +28,12 @@
  * `status` drives the chip in the rail and on the card. Only a non-`live`
  * status renders one — chipping everything is noise, and the point of the chip
  * is that something is NOT yet what it looks like.
+ *
+ * `requiresRole` is the access control, and its ABSENCE is meaningful: a module
+ * without one is open to any signed-in account, which is the right default for
+ * an internal portal where signing in IS the boundary. Naming a role is how a
+ * module says "not everyone here". The guard denies when a role is required and
+ * the session carries none — see src/auth/guard.js for why that direction.
  */
 
 export const MODULES = {
@@ -116,6 +122,10 @@ export const MODULES = {
   '/admin': {
     // No origin: static markup in public/admin/, served by the assets binding.
     href: '/admin/',
+    // The one module that is not for everyone with an account. Declared now,
+    // while the console is inert, so the gate is already in place on the day it
+    // first reads real client data rather than being remembered on that day.
+    requiresRole: 'admin',
     label: 'Admin',
     initials: 'AD',
     accent: 'gray',
@@ -165,6 +175,30 @@ export function matchComingSoon(pathname) {
     if (pathname === prefix || pathname === `${prefix}/`) return { prefix, entry };
   }
   return null;
+}
+
+/**
+ * The role required to see this path, if any.
+ *
+ * Deliberately NOT derived from `matchModule()`, which is a PROXY lookup and
+ * skips entries with no origin. `/admin` is exactly such an entry — static
+ * markup served by the assets binding — so a gate that read the requirement off
+ * the proxy match would silently protect nothing on the one module that has a
+ * requirement. Access control has to be answered for every path the portal
+ * serves, not only the ones it forwards.
+ *
+ * Longest prefix wins, so a future `/admin/public` could open a subtree back up
+ * without reordering the registry.
+ */
+export function requiredRoleFor(pathname) {
+  let best = null;
+  for (const [prefix, entry] of Object.entries(MODULES)) {
+    if (!prefix.startsWith('/') || !entry.requiresRole) continue;
+    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+      if (!best || prefix.length > best.prefix.length) best = { prefix, role: entry.requiresRole };
+    }
+  }
+  return best?.role ?? null;
 }
 
 /**

@@ -29,6 +29,11 @@ Worker runs on **every** request (`assets.run_worker_first`) and hands anything
 that isn't a module route back to `ASSETS`, so 404s come from the same place as
 the rest of the shell.
 
+`src/auth/` is the account system (WorkOS AuthKit — see **Authentication**
+below), and `src/retired.js` holds hostnames that used to be their own front
+door. Both are host- or path-matched *before* the module registry is consulted,
+so neither can be shadowed by a module.
+
 > `run_worker_first: true` is load-bearing. Without it, Workers Static Assets
 > serve before the Worker runs: a request for `/` on *any* hostname matches
 > `public/index.html` and returns the portal launcher without the Worker ever
@@ -54,8 +59,8 @@ Three kinds of entry:
   in the nav, but `matchModule()` skips it so it falls through to `ASSETS`.
   That check is why `/` — a prefix of every path — can safely live here.
 - **External** — `external: true`, keyed by its URL instead of a path. Linked
-  and never proxied. No entry uses this today (Finance did, until it moved
-  behind Access), but the kind is kept: "link, don't proxy" is still the right
+  and never proxied. No entry uses this today (Finance did, until it moved into
+  the portal), but the kind is kept: "link, don't proxy" is still the right
   answer for anything whose callers can't present a token.
 
 The URL key is the point, not a formatting choice: `matchModule()` only
@@ -230,26 +235,144 @@ No Access application covers a parked host — that is the point. Do not add one
 
 ## Authentication
 
-One Cloudflare Access application covers `portal.elevrics.ai`. Every request
-that reaches the router is already authenticated, and the
-`Cf-Access-Jwt-Assertion` header is forwarded to each origin unchanged.
+The portal is moving from Cloudflare Access (emailed one-time codes, no user
+model) to **portal-owned accounts on WorkOS AuthKit**. `docs/auth-architecture.md`
+is the full assessment, recommendation and rollout; this is the operating
+summary.
 
-**The router is a convenience layer, not a security boundary.** The Fly
-hostnames stay publicly reachable, so every origin verifies the Access token
-itself — a direct hit on `*.fly.dev` has to be rejected there, not here.
+### The one constraint that shapes everything
 
-Access also sets `Cf-Access-Authenticated-User-Email` on everything it lets
-through, and the rail now shows it at the foot — on the proxied modules too,
-where the header was already being forwarded and nothing displayed it. It tells
-you *which* identity you are using, which matters as soon as more than one
-policy exists.
+Every Fly origin verifies its own token, because the Fly hostnames stay publicly
+reachable and a direct hit on `*.fly.dev` has to be rejected *there*. So the
+moment Access comes off `portal.elevrics.ai`, the origins stop receiving
+`Cf-Access-Jwt-Assertion` and reject everything — unless they have already been
+taught to accept something else first.
 
-**Display only.** It must never gate anything: a header that decided what you
-can see would quietly contradict the paragraph above. It is escaped like every
-other value the rail renders. There is no sign-out control yet —
-`/cdn-cgi/access/logout` is handled at Cloudflare's edge before the Worker
-runs, so it cannot be verified under `wrangler dev`, and shipping UI that only
-a deploy can test seemed the wrong trade.
+That ordering is what `AUTH_MODE` exists to express:
+
+| Mode | State |
+|---|---|
+| `access` | As before. Access gates at the edge, `/auth/*` is not mounted. The escape hatch. |
+| `shadow` | `/auth/*` is live, a portal session is honoured and shown, the assertion is minted — but Access is still in front and still authoritative. **Nothing is blocked by the portal.** Migrate the origins from here. |
+| `enforce` | The portal session is required. Access can now be removed. |
+
+Committed default is `shadow`: deploying this repo must never be the thing that
+starts refusing requests.
+
+### What the portal owns, and what it doesn't
+
+**WorkOS owns** the password form, hashing, email verification, password reset,
+credential-stuffing defence, TOTP, passkeys, and — later — SAML connections and
+directory sync. There is no `/auth/register` and no `/auth/forgot-password` in
+this repo: they are AuthKit screens reached from the same authorize call with a
+different `screen_hint`. Avoiding a second place that collects a password is a
+security requirement here, not only a UX one.
+
+**The portal owns** the session cookie, route protection, roles as they apply to
+modules, and the assertion the modules verify.
+
+### Session
+
+`__Host-elv_session` — AES-GCM sealed (it carries a refresh token, so signing
+alone is not enough), HttpOnly, Secure, SameSite=Lax. The `__Host-` prefix is
+browser-enforced: no `Domain`, so the cookie can never reach a sibling subdomain.
+Sliding refresh with a hard 30-day ceiling carried across refreshes.
+
+Sign-out is a **POST** — a GET sign-out fires from any `<img>` and gets triggered
+by link prefetchers — and it ends the AuthKit session too, not just ours.
+`/auth/revoke` is "sign out everywhere": a floor timestamp in KV that kills older
+sessions at their next refresh, i.e. within minutes rather than instantly. That
+bound is the trade for having no session table.
+
+### The module assertion — what replaces the Access JWT
+
+The router mints `X-Elevrics-Assertion`: an ES256 JWT, 120 seconds, `aud` set to
+the module's routing prefix, with the public keys at
+`/.well-known/portal-jwks.json`. An origin swaps its Access verifier for this
+one — fetch a JWKS, check signature, `iss`, `aud`, `exp` — which is a
+substitution in code that already exists, not a new code path.
+
+Two properties are load-bearing:
+
+- **Every inbound `X-Elevrics-*` header is deleted before ours is added.**
+  Otherwise a caller could present a captured token to the portal and have the
+  router forward it to a module taught to trust exactly that header.
+- **`aud` is the prefix**, so a token minted for `/finance` cannot be replayed
+  against `/solayard`.
+
+`ASSERTION_SIGNING_KEY_NEXT` is published alongside during rotation, so rotating
+is a sequence rather than an outage.
+
+**The router is still not the only boundary, and must not become one.** Every
+origin keeps verifying for itself.
+
+### Roles
+
+`requiresRole` in `src/modules.js`. Its *absence* means "any signed-in account",
+which is the right default for an internal portal where signing in is the
+boundary; `/admin` declares `admin` now, while the console is inert, so the gate
+is in place on the day it first reads real data. A required role plus a session
+carrying no roles is a **deny** — "not rolled out yet, so allow" would make the
+gate silently absent during exactly the window nobody is watching it.
+
+`requiredRoleFor()` deliberately does not come from `matchModule()`: that is a
+*proxy* lookup and skips origin-less entries, and `/admin` is one.
+
+### Rate limiting
+
+WorkOS owns credential brute force (it owns the form). The real limit is a
+**Cloudflare rate-limiting rule on `/auth/*`**, which runs before the Worker —
+configure it in the dashboard; it is not in this repo. `src/auth/ratelimit.js` is
+the KV backstop for when that rule is missing, and it **fails open**: a limiter
+whose own storage outage takes sign-in down has inverted its job.
+
+### Configuration
+
+Vars are in `wrangler.jsonc`. Secrets are not:
+
+```bash
+npx wrangler secret put WORKOS_CLIENT_ID
+npx wrangler secret put WORKOS_API_KEY
+npx wrangler secret put SESSION_SECRET          # 32+ random bytes
+npx wrangler secret put ASSERTION_SIGNING_KEY   # ES256 private JWK, as JSON
+```
+
+Generate the signing key with:
+
+```bash
+node -e "crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify'])
+  .then(k=>crypto.subtle.exportKey('jwk',k.privateKey))
+  .then(j=>console.log(JSON.stringify({...j,kid:'portal-1'})))"
+```
+
+KV is optional (`npx wrangler kv namespace create AUTH_KV`, then uncomment the
+binding). Without it, sign-in works; only global revocation and the rate-limit
+backstop are absent, and both degrade deliberately rather than silently.
+
+---
+
+## `finance.elevrics.ai` is retired
+
+Finance is a module at `/finance`, not a separate front door. The old hostname is
+parked on this Worker and answers three ways, because three different kinds of
+traffic arrive there and one blanket redirect breaks one of them:
+
+| Request | Answer |
+|---|---|
+| A deep link | **301** to the same path under `/finance` — the mapping is one-to-one, since finapp is prefix-passed-through and strips the prefix itself. `Cache-Control: max-age=86400` bounds the browser cache; a 301 with none is cached effectively forever. |
+| The bare hostname | The retirement notice while `RETIREMENT_MODE=notice`, then 301. **Only** the front page — interrupting a bookmark to a specific page with an announcement is an irritation. |
+| `/api/*`, `/webhook*`, `/mcp*`, `/oauth*`, `/.well-known/*`, `/health*` | **410 Gone**, naming `finapp-v3.fly.dev`. Never a redirect: a webhook POST sent at an authentication wall gets HTML back, which Plaid records as something other than an error while the transaction never lands. A 410 fails loudly at the caller instead. |
+
+Answered before any session check (being made to sign in to learn where something
+moved is hostile) and before any path routing (so a retired host can never proxy
+to an internal module — the same guard the parked hosts carry).
+
+**The cutover is not in this repo.** Route `finance.elevrics.ai` at this Worker,
+then remove the custom domain from `finapp-v3` on Fly, delete its Access
+application, and confirm the Plaid dashboard, `APP_URL`, `CORS_ORIGINS` and any
+OAuth/MCP client configs point at the Fly hostname. Keep the DNS record
+indefinitely — deleting it turns every old bookmark into a DNS error instead of a
+redirect. Full list in `docs/auth-architecture.md`.
 
 ---
 
@@ -262,7 +385,9 @@ npx wrangler dev
 ```
 
 `npm test` (in `tests/`) covers prefix matching, redirect rewriting, cookie
-scoping, and that the nav and launcher stay derived from the registry.
+scoping, that the nav and launcher stay derived from the registry, the auth
+layer (sealing, the guard, the assertion, the callback's state check) and the
+retired-host mapping.
 
 The injection itself needs the Workers runtime, so it is checked under
 `npx wrangler dev` rather than in Node: that `/` and `/admin/` render the nav
@@ -286,6 +411,21 @@ Access in front of it to set:
 ```bash
 curl -H 'Cf-Access-Authenticated-User-Email: you@elevrics.ai' \
      -H 'Sec-Fetch-Dest: document' http://127.0.0.1:8788/solayard
+```
+
+The auth layer is unit-tested in Node (Web Crypto is a global in Node ≥ 20, so
+sealing, the assertion and the guard all run without wrangler). What needs a
+deploy is the part that talks to WorkOS — `wrangler dev` can reach the API with
+real secrets in `.dev.vars`, but the redirect URI has to be a real hostname, so
+the sign-in round trip is verified in `shadow` mode against the deployed Worker
+with Access still in front. That is what `shadow` is for.
+
+The retired host is testable locally without DNS, since it is matched on the
+`Host` header:
+
+```bash
+curl -i -H 'Host: finance.elevrics.ai' http://127.0.0.1:8788/accounts        # 301
+curl -i -H 'Host: finance.elevrics.ai' http://127.0.0.1:8788/api/plaid/webhook  # 410
 ```
 
 For an end-to-end check against the real apps, start the three origins locally
@@ -321,10 +461,31 @@ sweeps in `node_modules/workerd` (122 MiB) and fails the 25 MiB per-asset
 limit.
 
 One-time Cloudflare setup:
-1. Point `portal.elevrics.ai` at the Pages project.
+1. Point `portal.elevrics.ai` at this Worker.
 2. Create one Access application for `portal.elevrics.ai`, policy: your email.
+   **Keep it until `AUTH_MODE=enforce` has been exercised** — it is the thing
+   that stops a bad auth deploy from being a lockout.
 3. Set `URL_PREFIX` on the two prefix-stripped Fly apps
    (`fly secrets set URL_PREFIX=/solayard`, `.../opportunities`).
+4. Add a rate-limiting rule on `/auth/*` (see Authentication above — the
+   in-Worker limiter is only the backstop).
+5. Route `pathfinder.elevrics.ai` and `finance.elevrics.ai` at this Worker too.
+   The parked-host and retired-host guards are both host-matched, so neither
+   does anything until the hostname actually arrives here.
+
+The auth cutover, in order — each step is reversible, and skipping to the last
+one is the way to lock everyone out:
+
+1. Configure the WorkOS secrets and deploy with `AUTH_MODE=shadow`. Sign in at
+   `/auth/login`; the rail shows the portal account and a sign-out control.
+   Access is still enforcing, so nothing can break.
+2. Set `ASSERTION_SIGNING_KEY` and confirm `/.well-known/portal-jwks.json`.
+3. Migrate the origins one at a time: accept the portal assertion *in addition
+   to* the Access token. Verify each while Access is still in front.
+4. Flip to `AUTH_MODE=enforce`. Verify sign-in, sign-out, `/admin/` as a
+   non-admin, and one module deep link.
+5. Only now remove the Access application, and drop the Access branch from the
+   origins.
 
 ---
 

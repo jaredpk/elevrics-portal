@@ -449,6 +449,51 @@ html.elv-rail-pinned .elv-rail-viewer {
   color: var(--elv-navy);
 }
 
+/* Sign out. Hidden while the rail is collapsed for the same reason the address
+   is: at 64px there is room for one marker, and the avatar is it. Revealed with
+   the rest of the footer on hover, focus or pin — including keyboard focus, so
+   it is reachable without a pointer. */
+.elv-rail-signout {
+  display: none;
+  margin: 0 0 0 auto;
+}
+
+.elv-rail:hover .elv-rail-signout,
+.elv-rail:focus-within .elv-rail-signout,
+html.elv-rail-pinned .elv-rail-signout {
+  display: block;
+}
+
+.elv-rail-signout button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--elv-muted);
+  cursor: pointer;
+}
+
+.elv-rail-signout button svg { width: 15px; height: 15px; }
+
+.elv-rail-signout button:hover {
+  background: var(--elv-paper);
+  color: var(--elv-navy);
+}
+
+.elv-rail-signout button:focus-visible {
+  outline: 2px solid var(--elv-blue);
+  outline-offset: 1px;
+}
+
+/* Impersonation. Amber rather than the muted label colour, because the whole
+   point is that this state does not look like the ordinary one. */
+.elv-rail-impersonating { color: #9A5B00; }
+
 /* ---------- Module identity ----------
    Shared with the launcher cards, which is the point: one colour per module,
    wherever it appears. */
@@ -624,6 +669,19 @@ html.elv-rail-pinned .elv-rail-viewer {
   font-size: 0.68rem !important;
   color: var(--elv-navy) !important;
 }
+/* A host page's own `form { margin: 1em 0 }` or `button { background: … }` is
+   ordinary, and the sign-out control is a real <form> and a real <button>
+   inside someone else's document. */
+.elv-rail-signout { margin: 0 0 0 auto !important; padding: 0 !important; }
+.elv-rail-signout button {
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  color: var(--elv-muted) !important;
+  font: inherit !important;
+}
+.elv-rail-signout button:hover { background: var(--elv-paper) !important; color: var(--elv-navy) !important; }
+.elv-rail-impersonating { color: #9A5B00 !important; }
 
 /* ---------- Mobile ----------
    A horizontal pill scroller pinned to the top, not a hamburger: every

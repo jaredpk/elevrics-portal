@@ -294,6 +294,71 @@ footer {
   color: var(--muted);
 }
 
+/* ---------- Gate pages ----------
+   Signed out, sign-in problem, no access. The three pages a person sees when
+   they are NOT authenticated, or not cleared for what they asked for.
+
+   Centred, narrow, and with no rail — `.elv-plain` says so, and the router
+   never injects chrome here. That is a security property before it is a design
+   one: the rail enumerates every internal module by name, and these are the
+   portal pages an unauthenticated visitor is meant to reach. */
+
+body.elv-plain {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.elv-gate {
+  max-width: 27rem;
+  padding: 0;
+  text-align: center;
+}
+
+.elv-gate-mark { margin-bottom: 26px; }
+
+.elv-gate h1 {
+  margin: 0 0 12px;
+  font-size: 1.65rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--navy);
+}
+
+.elv-gate p { margin: 0 0 16px; color: var(--ink); }
+
+.elv-gate code {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.86em;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+.elv-gate-action {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 12px 24px;
+  border-radius: 10px;
+  background: var(--navy);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.elv-gate-action:hover { background: #0d2a55; }
+
+.elv-gate-note {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
 /* ---------- Mobile ----------
    A horizontal pill scroller, not a hamburger: every destination stays visible
    and one tap away. Nothing hides behind a menu at four modules. */

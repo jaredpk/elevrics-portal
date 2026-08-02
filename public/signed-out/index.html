@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Signed out · Elevrics Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- Linked, not inlined: this page IS on the portal origin, so its stylesheets
+     route normally. /css/ is on the guard's public allowlist for exactly this —
+     a sign-in surface that renders unstyled reads as broken. -->
+<link rel="stylesheet" href="/css/chrome.css">
+<link rel="stylesheet" href="/css/portal.css">
+</head>
+<!-- No `data-portal-nav`, and the router never injects chrome here. The rail
+     enumerates every internal module by name, and this is the one portal page a
+     signed-out visitor is meant to reach. -->
+<body class="elv-plain">
+
+<main class="elv-gate">
+  <svg class="elv-gate-mark" width="34" height="28" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9B5CF6"/><stop offset="100%" stop-color="#7B2CBF"/></linearGradient>
+      <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6D8EF8"/><stop offset="100%" stop-color="#3C6FF0"/></linearGradient>
+      <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2EC4BD"/><stop offset="100%" stop-color="#00A19A"/></linearGradient>
+    </defs>
+    <rect x="0" y="11" width="6" height="9" rx="2" fill="url(#g1)"/>
+    <rect x="9" y="5.5" width="6" height="14.5" rx="2" fill="url(#g2)"/>
+    <rect x="18" y="0" width="6" height="20" rx="2" fill="url(#g3)"/>
+  </svg>
+
+  <h1>Signed out</h1>
+  <p>You've been signed out of the Elevrics portal on this device.</p>
+
+  <p>
+    <a class="elv-gate-action" href="/auth/login">Sign in again</a>
+  </p>
+
+  <p class="elv-gate-note">
+    New here? <a href="/auth/signup">Create an account</a> — access is granted
+    per account, so a new one won't see anything until it's cleared.
+  </p>
+</main>
+
+</body>
+</html>

@@ -12,11 +12,15 @@ import { makeChromeInjector } from './chrome.js';
  * HTMLRewriter is a runtime global with no Node equivalent, so the injector is
  * built here and handed to the router. The router and the local harness both
  * work without it.
+ *
+ * `env` is passed through for the same dependency-injection reason: the auth
+ * layer reads its secrets, its KV binding and its mode flag from it, and the
+ * unit tests hand in a plain object instead.
  */
 const injectChrome = makeChromeInjector(HTMLRewriter);
 
 export default {
   async fetch(request, env) {
-    return handleRequest(request, (req) => env.ASSETS.fetch(req), injectChrome);
+    return handleRequest(request, (req) => env.ASSETS.fetch(req), injectChrome, env);
   },
 };
