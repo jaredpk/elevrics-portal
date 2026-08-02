@@ -524,3 +524,48 @@ test('the JWKS publishes only verification fields', async () => {
   assert.deepEqual(body.keys[0].key_ops, ['verify']);
   assert.equal(body.keys[0].ext, undefined);
 });
+
+test('each callback failure carries its own reason code', async () => {
+  // The page stays vague on purpose; the reason is for whoever operates this.
+  // Three unrelated faults rendering one identical sentence is what made a real
+  // cutover undebuggable.
+  const config = authConfig(env());
+  const good = await seal(
+    { state: 'the-real-state', next: '/', exp: Math.floor(Date.now() / 1000) + 60 },
+    SECRET,
+    'login',
+  );
+  const expired = await seal(
+    { state: 'the-real-state', next: '/', exp: Math.floor(Date.now() / 1000) - 1 },
+    SECRET,
+    'login',
+  );
+
+  const reasonFor = async (query, stateCookie) => {
+    const url = new URL(`https://portal.elevrics.ai/auth/callback${query}`);
+    const headers = stateCookie ? { Cookie: `${LOGIN_COOKIE}=${stateCookie}` } : {};
+    const response = await handleAuthRoute(new Request(url, { headers }), url, config);
+    return response.headers.get('X-Elevrics-Auth-Error');
+  };
+
+  assert.equal(await reasonFor('?code=x&state=y', null), 'no_state_cookie');
+  assert.equal(await reasonFor('?code=x&state=y', 'v1.garbage.garbage'), 'state_unsealable');
+  assert.equal(await reasonFor('?code=x&state=wrong', good), 'state_mismatch');
+  assert.equal(await reasonFor('?code=x&state=the-real-state', expired), 'state_expired');
+  assert.equal(await reasonFor('?state=the-real-state', good), 'no_code');
+  assert.equal(
+    await reasonFor('?state=the-real-state&error=access_denied', good),
+    'provider_error',
+  );
+});
+
+test('the reason never leaks whether an account exists', async () => {
+  // Every code names a branch of routes.js. None is derived from the identity
+  // being signed in, so probing with a real address tells you nothing.
+  const config = authConfig(env());
+  const url = new URL('https://portal.elevrics.ai/auth/callback?code=x&state=y');
+  const response = await handleAuthRoute(new Request(url), url, config);
+  const reason = response.headers.get('X-Elevrics-Auth-Error');
+  assert.match(reason, /^[a-z0-9_]+$/);
+  assert.ok(!reason.includes('@'));
+});

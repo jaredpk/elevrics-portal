@@ -139,36 +139,53 @@ async function finishLogin(request, url, config) {
 
   const clearLoginState = clearCookie(LOGIN_COOKIE);
 
-  const pending = await unseal(
-    readCookie(request, LOGIN_COOKIE),
-    config.sessionSecret,
-    'login',
-  );
+  const raw = readCookie(request, LOGIN_COOKIE);
+  const pending = await unseal(raw, config.sessionSecret, 'login');
   const state = url.searchParams.get('state');
 
-  if (!pending || !timingSafeEqual(pending.state ?? '', state ?? '')) {
-    return authError('Sign-in could not be completed. Start again from the portal.', 400, clearLoginState);
+  // The cookie is missing entirely versus present-but-not-matching are very
+  // different problems — a browser that didn't send it (SameSite, prefix
+  // rejection, a cross-site hop we didn't anticipate) versus a stale or
+  // replayed attempt. Same refusal either way, different `reason`.
+  if (!raw) {
+    return authError('Sign-in could not be completed. Start again from the portal.', 400, clearLoginState, 'no_state_cookie');
+  }
+  if (!pending) {
+    // Unsealable: almost always SESSION_SECRET changed between the two halves
+    // of the round trip.
+    return authError('Sign-in could not be completed. Start again from the portal.', 400, clearLoginState, 'state_unsealable');
+  }
+  if (!timingSafeEqual(pending.state ?? '', state ?? '')) {
+    return authError('Sign-in could not be completed. Start again from the portal.', 400, clearLoginState, 'state_mismatch');
   }
   if (pending.exp < Math.floor(Date.now() / 1000)) {
-    return authError('That sign-in link expired. Start again from the portal.', 400, clearLoginState);
+    return authError('That sign-in link expired. Start again from the portal.', 400, clearLoginState, 'state_expired');
   }
 
   // AuthKit reports user-facing failures (access denied, unverified email) on
   // the redirect rather than at the token endpoint.
   const providerError = url.searchParams.get('error_description') ?? url.searchParams.get('error');
-  if (providerError) return authError(providerError, 400, clearLoginState);
+  if (providerError) return authError(providerError, 400, clearLoginState, 'provider_error');
 
   const code = url.searchParams.get('code');
-  if (!code) return authError('Sign-in could not be completed.', 400, clearLoginState);
+  if (!code) return authError('Sign-in could not be completed.', 400, clearLoginState, 'no_code');
 
   const result = await exchangeCode(config, code);
   if (!result.ok) {
-    return authError('Sign-in could not be completed. Start again from the portal.', 502, clearLoginState);
+    // The overwhelmingly common cause is a WORKOS_API_KEY that doesn't match the
+    // environment the client id belongs to — including a key that was revoked
+    // and replaced without the new one being stored.
+    return authError(
+      'Sign-in could not be completed. Start again from the portal.',
+      502,
+      clearLoginState,
+      `exchange_failed_${result.status}`,
+    );
   }
 
   const { session, cookie: sessionSet } = await startSession(result.data, config);
   if (!session.sub) {
-    return authError('Sign-in returned no account.', 502, clearLoginState);
+    return authError('Sign-in returned no account.', 502, clearLoginState, 'no_subject');
   }
 
   const response = redirect(safeNext(pending.next));
@@ -181,8 +198,22 @@ async function finishLogin(request, url, config) {
  * A sign-in failure the user can read, without telling them anything useful if
  * they are not the intended user. The provider's own message is passed through
  * only for the AuthKit-reported cases above, which are already user-facing.
+ *
+ * `reason` is the operator's half, and adding it was a correction: the first
+ * version gave every failure the same words on the grounds that distinguishing
+ * them helps an attacker probe. True, but it also makes the flow undebuggable
+ * for the person who owns it — three unrelated faults rendering one sentence,
+ * with no way to tell which fired. The split is: the PAGE stays vague, while a
+ * response header and a log line carry a short non-sensitive code. Neither
+ * reveals whether an account exists, and both turn "it doesn't work" into a
+ * name you can act on.
+ *
+ * Read it with `npx wrangler tail`, or in the Network tab.
  */
-function authError(message, status, setCookie) {
+function authError(message, status, setCookie, reason = 'unspecified') {
+  // Shows up in `wrangler tail` and in Workers observability, which is already
+  // enabled in wrangler.jsonc.
+  console.error(`[auth] callback refused: ${reason} (${status})`);
   return new Response(
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
       `<meta name="viewport" content="width=device-width, initial-scale=1">` +
@@ -192,12 +223,17 @@ function authError(message, status, setCookie) {
       `</head><body class="elv-plain"><main class="elv-gate">` +
       `<h1>Sign-in problem</h1><p>${escapeHtml(message)}</p>` +
       `<p><a class="elv-gate-action" href="/auth/login">Try again</a></p>` +
+      // Visible to whoever is looking at the page, which is the operator during
+      // a cutover. It names a branch of this file, not anything about the
+      // account being signed into.
+      `<p class="elv-gate-note">Reference: <code>${escapeHtml(reason)}</code></p>` +
       `</main></body></html>`,
     {
       status,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-store',
+        'X-Elevrics-Auth-Error': reason,
         ...(setCookie ? { 'Set-Cookie': setCookie } : {}),
       },
     },
