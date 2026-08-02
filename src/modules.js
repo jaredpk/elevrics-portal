@@ -92,24 +92,22 @@ export const MODULES = {
       'must-have thresholds and per-row confidence bands.',
   },
 
-  // Linked, never proxied. finapp receives Plaid webhooks, serves an MCP
-  // endpoint and runs its own OAuth server (issuer = APP_URL) — none of those
-  // callers can present a Cloudflare Access token, and webhook failures are
-  // silent, surfacing days later as stale transactions. It also has its own
-  // Supabase login, so Access would be a second sign-in rather than the sign-in.
-  //
-  // Keyed by its URL rather than a path so it CANNOT become a route: matchModule()
-  // only considers keys starting with "/". Do NOT add an `origin` here — that is
-  // the field that turns an entry into a proxy target, and proxying this is
-  // precisely what breaks it.
-  'https://finance.elevrics.ai': {
-    external: true,
+  '/finance': {
+    origin: 'https://finapp-v3.fly.dev',
+    // Vite `base` is /finance/, so the app emits prefixed asset URLs and the
+    // service worker gets a matching scope. Passed through; the app strips the
+    // prefix itself so its routes stay registered at root.
+    stripPrefix: false,
+    // OFF for the same reason as Pathfinder: a React SPA hydrates from the
+    // server markup, and an injected <body> child is exactly what it may object
+    // to. Flip on only after checking the deployed module for hydration errors.
+    injectChrome: false,
     label: 'Finance',
     initials: 'FN',
     accent: 'green',
     group: 'Modules',
     status: 'live',
-    stack: 'separate sign-in',
+    stack: 'Express + React · Postgres',
     blurb:
       'Net worth, accounts, transactions, budgets and cashflow, linked ' +
       'through Plaid.',

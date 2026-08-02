@@ -15,6 +15,7 @@ import { MODULES } from '../src/modules.js';
 MODULES['/solayard'].origin = 'http://127.0.0.1:8077';
 MODULES['/opportunities'].origin = 'http://127.0.0.1:8099';
 MODULES['/pathfinder'].origin = 'http://127.0.0.1:3999';
+MODULES['/finance'].origin = 'http://127.0.0.1:3011';
 
 const server = http.createServer(async (req, res) => {
   const url = `http://127.0.0.1:8090${req.url}`;

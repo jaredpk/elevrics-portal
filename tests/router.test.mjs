@@ -86,31 +86,49 @@ test('falls through for the shell and admin', () => {
   assert.equal(matchModule('/css/portal.css'), null);
 });
 
+/**
+ * A synthetic external entry. No module uses `external: true` today — Finance
+ * did until it moved behind Access and became a proxied module — but the kind
+ * is still supported, and the guard below is what would matter again the moment
+ * something with token-less callers is added. See tests/nav.test.mjs.
+ */
+const EXTERNAL_KEY = 'https://example.invalid';
+
+function withExternal(fn) {
+  MODULES[EXTERNAL_KEY] = { external: true, label: 'Example', initials: 'EX', accent: 'gray', group: 'Modules', status: 'live', stack: 'x', blurb: 'x' };
+  try { return fn(EXTERNAL_KEY); } finally { delete MODULES[EXTERNAL_KEY]; }
+}
+
 test('an external registry entry can never be routed to', () => {
-  // The guard that matters most: finapp must be LINKED, not proxied. Its Plaid
-  // webhooks and OAuth callers carry no Access token, and the breakage is
-  // silent. Keyed by URL, no pathname can match — even if an origin appears.
-  const externals = Object.entries(MODULES).filter(([, c]) => c.external);
-  for (const [prefix] of some(externals, 'external registry entries')) {
-    assert.equal(matchModule(prefix), null);
-    for (const path of ['/finance', '/finance/accounts', prefix, `${prefix}/webhook`]) {
-      assert.equal(matchModule(path), null, `${path} routed to an external destination`);
+  // Keyed by URL, so no pathname can match — even if an origin appears.
+  withExternal((key) => {
+    const externals = Object.entries(MODULES).filter(([, c]) => c.external);
+    for (const [prefix] of some(externals, 'external registry entries')) {
+      assert.equal(matchModule(prefix), null);
+      for (const path of ['/example', '/example/accounts', prefix, `${prefix}/webhook`]) {
+        assert.equal(matchModule(path), null, `${path} routed to an external destination`);
+      }
     }
-  }
+  });
 });
 
 test('adding an origin to an external entry still does not route it', () => {
   // Defends the exact mistake someone would make later: reading `origin` as
   // "where it lives" rather than "proxy this".
-  const key = Object.keys(MODULES).find((k) => MODULES[k].external);
-  MODULES[key].origin = 'https://finance.elevrics.ai';
-  try {
-    for (const path of ['/finance', '/', '/admin/', key]) {
+  withExternal((key) => {
+    MODULES[key].origin = 'https://example.invalid';
+    for (const path of ['/example', '/', '/admin/', key]) {
       assert.equal(matchModule(path), null, `${path} became routable`);
     }
-  } finally {
-    delete MODULES[key].origin;
-  }
+  });
+});
+
+test('finance IS routed — it is a proxied module, not an external entry', () => {
+  assert.equal(matchModule('/finance').prefix, '/finance');
+  assert.equal(matchModule('/finance/api/accounts').prefix, '/finance');
+  assert.equal(MODULES['/finance'].stripPrefix, false);
+  assert.equal(MODULES['/finance'].external, undefined);
+  assert.equal(matchModule('/financials'), null);
 });
 
 test('a registry entry with no origin is never proxied', () => {

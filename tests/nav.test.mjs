@@ -8,6 +8,35 @@ import { MODULES, hrefFor, isCurrent } from '../src/modules.js';
 const externals = () => Object.entries(MODULES).filter(([, e]) => e.external);
 
 /**
+ * A synthetic external entry.
+ *
+ * No module uses `external: true` today — Finance did until it moved behind
+ * Access and became a proxied module. The kind is still supported code, and the
+ * guard it carries ("keyed by URL, so no pathname can ever match") is the thing
+ * that would matter again the moment something with token-less callers gets
+ * added. Testing it against a fixture keeps that property covered without
+ * requiring a real external module to exist.
+ */
+const EXTERNAL_KEY = 'https://example.invalid';
+const EXTERNAL_ENTRY = {
+  external: true,
+  label: 'Example',
+  initials: 'EX',
+  accent: 'gray',
+  group: 'Modules',
+  status: 'live',
+  stack: 'separate sign-in',
+  blurb: 'A destination on another host, linked and never proxied.',
+};
+
+/** Run `fn` with the fixture present in the registry, then remove it. */
+function withExternal(fn) {
+  MODULES[EXTERNAL_KEY] = { ...EXTERNAL_ENTRY };
+  try { return fn(EXTERNAL_KEY); } finally { delete MODULES[EXTERNAL_KEY]; }
+}
+
+
+/**
  * The rail and the launcher grid are rendered from the registry, so the property
  * worth asserting is that they STAY derived from it — a link that exists in the
  * markup but not the registry is exactly the drift this replaced.
@@ -35,16 +64,16 @@ test('every registry entry appears in the rail', () => {
 });
 
 test('an external destination is linked, never routed', () => {
-  // finapp takes Plaid webhooks and runs its own OAuth server; proxying it
-  // would block every caller that cannot present an Access token, and those
-  // failures are silent. Keying it by URL is what makes that impossible.
+  withExternal(() => {
   for (const [prefix, entry] of some(externals(), 'external registry entries')) {
     assert.ok(!prefix.startsWith('/'), `${prefix} is external but keyed as a path`);
     assert.equal(entry.origin, undefined, `${prefix} is external AND has an origin — it would be proxied`);
   }
+  });
 });
 
 test('an external link opens away from the portal, and says so', () => {
+  withExternal(() => {
   const rail = renderRail('/');
   const cards = renderCards();
   for (const [prefix] of some(externals(), 'external registry entries')) {
@@ -57,20 +86,25 @@ test('an external link opens away from the portal, and says so', () => {
   // The arrow is decorative — the announcement has to be real text.
   assert.match(rail, /aria-hidden="true">\u2197</);
   assert.match(rail, /class="elv-sr-only"> \(opens in a new tab\)</);
+  });
 });
 
 test('an external destination is never the current page', () => {
   // It is another origin; no portal path can be "inside" it.
-  for (const [prefix] of some(externals(), 'external registry entries')) {
-    for (const path of ['/', '/admin/', prefix, `${prefix}/accounts`]) {
-      assert.ok(!isCurrent(prefix, path), `${prefix} marked current for ${path}`);
+  withExternal(() => {
+    for (const [prefix] of some(externals(), 'external registry entries')) {
+      for (const path of ['/', '/admin/', prefix, `${prefix}/accounts`]) {
+        assert.ok(!isCurrent(prefix, path), `${prefix} marked current for ${path}`);
+      }
     }
-  }
+  });
 });
 
 test('an external card shows its host, not its scheme', () => {
-  assert.match(renderCards(), /finance\.elevrics\.ai · separate sign-in/);
-  assert.doesNotMatch(renderCards(), /https:\/\/finance\.elevrics\.ai ·/);
+  withExternal(() => {
+    assert.match(renderCards(), /example\.invalid · separate sign-in/);
+    assert.doesNotMatch(renderCards(), /https:\/\/example\.invalid ·/);
+  });
 });
 
 test('the rail links nowhere the registry does not', () => {

@@ -20,7 +20,7 @@ onto a path:
 | `/solayard` | `solayard-intel.fly.dev` | `jaredpk/solayard-intel` |
 | `/opportunities` | `elevrics-opportunities.fly.dev` | `jaredpk/elevrics-opportunities` |
 | `/pathfinder` | `elevrics-relocation.fly.dev` | `jaredpk/elevrics-relocation` |
-| Finance (link out) | `finance.elevrics.ai` | `jaredpk/finapp-v3` |
+| `/finance` | `finapp-v3.fly.dev` | `jaredpk/finapp-v3` |
 
 `src/modules.js` is the registry — the single source of truth for what the
 portal contains. `src/router.js` proxies from it, `src/nav.js` renders the nav
@@ -53,15 +53,18 @@ Three kinds of entry:
 - **Portal-owned** — no `origin` (`/`, `/admin`). Served from `public/`; still
   in the nav, but `matchModule()` skips it so it falls through to `ASSETS`.
   That check is why `/` — a prefix of every path — can safely live here.
-- **External** — `external: true`, keyed by its URL instead of a path
-  (Finance). Linked and never proxied.
+- **External** — `external: true`, keyed by its URL instead of a path. Linked
+  and never proxied. No entry uses this today (Finance did, until it moved
+  behind Access), but the kind is kept: "link, don't proxy" is still the right
+  answer for anything whose callers can't present a token.
 
 The URL key is the point, not a formatting choice: `matchModule()` only
 forwards entries whose key starts with `/`, so no `pathname` can ever match an
 external entry — the guard holds even if someone later adds an `origin` to one,
 reading it as "where it lives" rather than "proxy this". Both halves are
-asserted in `tests/`, because getting it wrong breaks Plaid webhooks silently
-(see below).
+asserted in `tests/` against a fixture entry, since no real module is external
+right now — a guard that only runs when something happens to use it is a guard
+that rots.
 
 A fourth axis crosses those: `status`. `live` renders no chip; anything else
 (`shell`, `beta`, `coming_soon`) chips itself in the rail and on its card, so a
@@ -159,7 +162,7 @@ Its list is **read off the rail**, not passed in separately. The rail is already
 rendered from the registry, so reading it back means there is no second copy to
 drift — whatever the server decided is in the nav, including which entry is
 current and which leaves the portal, is exactly what the switcher offers.
-Finance opens in a new tab from here because it does from there.
+An external entry would open in a new tab from here because it does from there.
 
 The button ships `hidden` and `portal.js` reveals it: it does nothing without
 JavaScript, and a control that does nothing is worse than no control. Everything
@@ -190,29 +193,23 @@ portal-space URLs itself. The router additionally rewrites `Location` headers
 and scopes `Set-Cookie` paths on the way back, so a redirect or a session cookie
 can't escape its module.
 
-`/pathfinder` is **passed through whole**: Next.js `basePath` expects to see
-`/pathfinder` in the path and generates correctly prefixed asset URLs on its own.
+`/pathfinder` and `/finance` are **passed through whole**. Next.js `basePath`
+and Vite `base` both expect to see the prefix and generate matching asset URLs
+from it; finapp additionally strips the prefix server-side, so all of its routes
+stay registered at root — which is how its machine callers still reach it
+unprefixed.
 
-### Why Finance links out instead of being proxied
+### Finance keeps machine callers on the Fly hostname
 
 `finapp-v3` receives Plaid webhooks, serves an MCP endpoint, and runs its own
-OAuth server (`/.well-known/oauth-authorization-server`, issuer = `APP_URL`).
-None of those callers can present a Cloudflare Access token, so proxying it
-behind the portal would block them — and webhook failures are silent, surfacing
-days later as stale transactions. It also has its own Supabase login, so Access
-would be a second sign-in rather than the sign-in.
+OAuth server. None of those callers can present an Access token, so they keep
+hitting `finapp-v3.fly.dev` unprefixed — the same split SolaYard already uses
+for its GitHub Actions cron. `APP_URL` stays on the Fly hostname, so the OAuth
+issuer is stable and no MCP client has to re-authorize.
 
-It stays on `finance.elevrics.ai` with a launcher card pointing at it. The
-portal is still the single front door; only this one card leaves the origin.
-
-In the registry it is `external: true` and keyed by its URL, which is what makes
-proxying it structurally impossible rather than merely discouraged. Both the
-rail entry and the card open in a new tab and carry an ↗ affordance plus
-screen-reader text, so leaving the portal is visible rather than surprising.
-
-One consequence for the chrome work: the rail cannot follow you to Finance. It
-is a separate origin the Worker never sees, so there is nothing to inject into
-— the ↗ is doing real work there, marking the one edge of the portal.
+Its Supabase login was removed rather than stacked under Access: the app has no
+user model (hardcoded allowed email, identity never read downstream), so Access
+replaces it and one portal sign-in covers every module.
 
 ### Parked hosts
 
