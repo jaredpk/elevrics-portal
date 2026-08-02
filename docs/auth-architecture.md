@@ -198,43 +198,60 @@ step.
 
 ## 3. Retiring `finance.elevrics.ai`
 
-Treated as a consolidation, not a redirect, because three different kinds of
-traffic arrive at that hostname and one blanket rule breaks one of them.
+Finance is a module at `/finance`. The old hostname stops being a front door.
 
 | Request | Answer | Why |
 |---|---|---|
-| Deep link (a bookmark) | **301** to the same path under `/finance`, `Cache-Control: public, max-age=86400`, `Link: rel=canonical`, `Deprecation: true` | Permanent for bookmarks and crawlers; bounded in the browser, because a 301 with no cache header is cached effectively forever and that is a bad property to hand a redirect on day one. |
-| Bare hostname | **Retirement notice** during the announced window, then 301 | The move gets announced rather than merely happening to someone. Only the front page — interrupting a bookmark to a specific page with an announcement is an irritation, and the portal chrome around the page tells them where they are. |
-| `/api/*`, `/webhook*`, `/mcp*`, `/oauth*`, `/.well-known/*`, `/health*` | **410 Gone**, naming `finapp-v3.fly.dev` in the body | **The one that would have hurt.** A webhook POST redirected into the portal meets an authentication wall and gets HTML back — a shape Plaid records as something other than an error while the transaction never lands. A 410 fails loudly at the caller instead. These callers were never meant to be on this hostname: `APP_URL` is the Fly hostname precisely so the OAuth issuer is stable. |
+| Anything a browser asks for | **301** to the same path under `/finance`, `Cache-Control: public, max-age=86400`, `Link: rel=canonical`, `Deprecation: true` | The mapping is one-to-one: finapp is prefix-passed-through and strips the prefix itself, so every route at the old root exists unchanged one level down. Permanent for bookmarks; bounded in the browser, because a 301 with no cache header is cached effectively forever. |
+| `/api/*`, `/webhook*`, `/mcp*`, `/oauth*`, `/.well-known/*`, `/health*` | **410 Gone**, naming `finapp-v3.fly.dev` in the body | A webhook POST redirected into the portal meets an authentication wall and gets HTML back — a shape Plaid records as something other than an error while the transaction never lands. A 410 fails loudly at the caller instead. Plaid and MCP are confirmed pointed at the Fly hostname, so this should never fire; it stays because ten lines against a silent financial-integration failure is a trade worth making. |
 
-Answered **before** any session check: being made to sign in to be told where
-something moved is hostile, and a redirect discloses nothing the hostname didn't.
-Answered **before** any path routing, so the retired host can never proxy to an
-internal module — the same guard the parked hosts carry.
+Answered **before** any session check (being made to sign in to be told where
+something moved is hostile, and a redirect discloses nothing the hostname
+didn't) and **before** any path routing, so the retired host can never proxy to
+an internal module — the same guard the parked hosts carry.
 
-`RETIREMENT_MODE=notice` ships as the default; flip to `redirect` when the window
-closes and delete `public/finance-retired/` a release later.
+**No retirement-notice interstitial.** An earlier pass had one behind a
+`RETIREMENT_MODE` flag. This portal has one user, who made the decision: a notice
+page for an audience of zero is a page to maintain and a flag to remember to
+flip. If a future retirement has users to warn, add it back then.
 
 ### Out-of-repo steps
 
-These cannot be done from this repository and are the actual cutover:
+None of this runs until `finance.elevrics.ai` resolves to this Worker, and
+routing it there is **optional**. What it buys is narrow but real: the browser
+autocompletes the old hostname from history for months, and routed, that muscle
+memory lands in `/finance` instead of on a DNS error. One record.
 
-1. **Route `finance.elevrics.ai` at this Worker** (Cloudflare → Workers Routes /
-   Custom Domains). Until this is done, none of the above executes.
-2. **Remove the custom domain and certificate from `finapp-v3` on Fly**, after
-   (1), so the name resolves in one place only.
-3. **Delete the Cloudflare Access application** covering `finance.elevrics.ai`.
-   A retired host must not sit behind a login.
-4. **Audit for the old hostname** in: the Plaid dashboard (redirect URI, webhook
-   URL), finapp's `APP_URL` / `CORS_ORIGINS` / cookie-domain settings, any OAuth
-   client registrations or MCP client configs, and DNS. Each should already point
-   at `finapp-v3.fly.dev`; confirm rather than assume.
-5. **Keep the DNS record** pointing at the Worker indefinitely. Deleting it turns
-   every old bookmark into a DNS error instead of a redirect.
+**If you route it** (recommended, ~5 minutes):
 
-No CORS, callback URL, cookie domain or auth redirect in the portal depends on
-the finance subdomain — the portal's cookies are `__Host-` prefixed, which
-cannot carry a `Domain` at all.
+1. **Cloudflare → Zero Trust → Access → Applications** — delete the application
+   covering `finance.elevrics.ai`. A retired host must stay public: the redirect
+   has to answer without a session, and a login in front of it defeats the point.
+2. **Fly** — `fly certs remove finance.elevrics.ai -a finapp-v3`, and remove the
+   corresponding IP/CNAME allocation. Do this first so the name resolves in one
+   place only and Fly stops trying to renew a cert for a name it no longer serves.
+3. **Cloudflare → DNS** — delete the existing `finance` record (the CNAME/A
+   pointing at Fly). Step 4 will not attach to a hostname that already has one.
+4. **Cloudflare → Workers & Pages → `elevrics-portal` → Settings → Domains &
+   Routes → Add → Custom Domain** — enter `finance.elevrics.ai`. Cloudflare
+   creates the proxied DNS record and issues the certificate itself.
+   *Custom Domain, not Route:* a Route needs a DNS record to already exist and
+   attaches to a pattern; a Custom Domain manages both the record and the cert,
+   which is what the other portal hostnames use.
+5. **Verify:**
+   ```bash
+   curl -sI https://finance.elevrics.ai/accounts | head -3          # 301 → /finance/accounts
+   curl -s  https://finance.elevrics.ai/api/plaid/webhook           # 410, names fly.dev
+   ```
+
+**If you don't route it:** do steps 1–3 and stop. `finance.elevrics.ai` stops
+resolving, `src/retired.js` never executes (it is host-matched), and the only
+cost is that autocompleting the old name gives a DNS error instead of a redirect.
+
+Either way, nothing else depends on the subdomain. Plaid, MCP and the OAuth
+issuer are confirmed on `finapp-v3.fly.dev`, and no CORS rule, callback URL,
+cookie domain or auth redirect in the portal references it — the portal's cookies
+are `__Host-` prefixed, which cannot carry a `Domain` at all.
 
 ---
 
@@ -257,7 +274,7 @@ cannot carry a `Domain` at all.
 
 ## 5. Testing checklist
 
-Automated (`npm test`, 106 tests):
+Automated (`npm test`, 107 tests):
 
 - [x] Seal round-trip; tamper, truncation, wrong key and cross-purpose all → null
 - [x] Cookie flags: `__Host-`, HttpOnly, Secure, SameSite, no `Domain`
@@ -273,7 +290,7 @@ Automated (`npm test`, 106 tests):
 - [x] Assertion verifies against the published JWKS; `aud` is the prefix; ≤120s
 - [x] JWKS never publishes `d`; publishes both keys mid-rotation
 - [x] Inbound `X-Elevrics-*` stripped
-- [x] Retired host: deep-link 301, root notice, machine-path 410, never a module
+- [x] Retired host: 301 with the path preserved, machine-path 410, never a module
 - [x] Three-argument `handleRequest` callers still route unchanged
 
 Manual, needs a deploy (`wrangler dev` has no Access and no WorkOS in front):
@@ -286,6 +303,6 @@ Manual, needs a deploy (`wrangler dev` has no Access and no WorkOS in front):
 - [ ] `/admin/` as a non-admin → 403, not a sign-in loop
 - [ ] A module XHR after expiry gets 401 JSON, not an HTML login page
 - [ ] Rail and quick-switcher still render inside the proxied modules
-- [ ] `finance.elevrics.ai/accounts` → the same page in the portal
+- [ ] `finance.elevrics.ai/accounts` → the same page in the portal (only if routed)
 - [ ] `finance.elevrics.ai/api/plaid/webhook` → 410, and Plaid still delivers to Fly
 - [ ] One origin migrated to the assertion still works with Access in front

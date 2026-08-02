@@ -10,25 +10,32 @@
  *
  * finance.elevrics.ai is the first, and the shape below is the general answer.
  *
- * THREE KINDS OF REQUEST arrive at a retired host, and collapsing them into one
+ * TWO KINDS OF REQUEST arrive at a retired host, and collapsing them into one
  * blanket redirect is the mistake this file exists to avoid:
  *
- *   1. A deep link a human bookmarked  → 301 to the same path in the portal.
- *   2. The bare hostname               → a retirement notice, for a window, so
- *                                        the consolidation is announced rather
- *                                        than merely happening to someone.
- *   3. A machine endpoint              → 410 Gone. NOT a redirect.
+ *   1. A browser         → 301 to the same path in the portal.
+ *   2. A machine endpoint → 410 Gone. NOT a redirect.
  *
- * (3) is the one that would have hurt. finapp receives Plaid webhooks, serves an
+ * (2) is the one that would have hurt. finapp receives Plaid webhooks, serves an
  * MCP endpoint and runs its own OAuth server; those callers cannot present a
  * session. Redirecting them into the portal sends a webhook POST at an
  * authentication wall, which answers 302-then-HTML — a shape Plaid will record
  * as a delivered-ish non-error while the transaction never lands. A 410 with the
  * canonical hostname in the body fails loudly at the caller instead, which is
- * the only way a misconfiguration gets noticed rather than absorbed. Machine
- * traffic was never supposed to be on this hostname anyway: `APP_URL` is the Fly
- * hostname precisely so the OAuth issuer is stable, so a hit here is already a
- * config error somewhere.
+ * the only way a misconfiguration gets noticed rather than absorbed.
+ *
+ * Machine traffic was never supposed to be on this hostname — `APP_URL` is the
+ * Fly hostname precisely so the OAuth issuer is stable, and the Plaid and MCP
+ * configuration has been confirmed to point there — so in practice this branch
+ * should never fire. It stays because the asymmetry is stark: ten lines against
+ * a financial integration failing silently if something ever regresses.
+ *
+ * WHAT IS DELIBERATELY NOT HERE: a retirement-notice interstitial. An earlier
+ * pass had one, behind a mode flag, so the consolidation could be announced
+ * before it took effect. There is nobody to announce it to — this portal has one
+ * user, who made the decision. A notice page for an audience of zero is a page
+ * to maintain, and the flag guarding it was a second thing to remember to flip.
+ * If a future retirement ever does have users to warn, add it back then.
  */
 
 export const RETIRED_HOSTS = {
@@ -59,8 +66,6 @@ export const RETIRED_HOSTS = {
       '/health',
       '/healthz',
     ],
-    /** The asset served in `notice` mode. */
-    notice: '/finance-retired/',
   },
 };
 
@@ -94,17 +99,8 @@ export function retiredTarget(entry, url, portalOrigin) {
   return target.toString();
 }
 
-/**
- * Answer a request on a retired hostname.
- *
- * @param mode 'notice' during the announced window, 'redirect' afterwards.
- *   The notice only ever applies to the BARE HOSTNAME — a deep link goes
- *   straight to its content in both modes. Interrupting someone who followed a
- *   bookmark to a specific page with an announcement about the move is how you
- *   turn a clean consolidation into an irritation, and they will find out where
- *   they are from the portal chrome around the page they wanted.
- */
-export async function handleRetiredHost(entry, url, serveAssets, { mode, portalOrigin }) {
+/** Answer a request on a retired hostname. */
+export function handleRetiredHost(entry, url, { portalOrigin }) {
   if (isMachinePath(entry, url.pathname)) {
     return new Response(
       JSON.stringify({
@@ -127,19 +123,6 @@ export async function handleRetiredHost(entry, url, serveAssets, { mode, portalO
   }
 
   const target = retiredTarget(entry, url, portalOrigin);
-  const isRoot = url.pathname === '/' || url.pathname === '';
-
-  if (mode === 'notice' && isRoot) {
-    const assetUrl = new URL(url);
-    assetUrl.pathname = entry.notice;
-    assetUrl.search = '';
-    const response = await serveAssets(new Request(assetUrl, { method: 'GET' }));
-    const headers = new Headers(response.headers);
-    headers.set('X-Robots-Tag', 'noindex, nofollow');
-    headers.set('Cache-Control', 'no-store');
-    headers.set('Link', `<${target}>; rel="canonical"`);
-    return new Response(response.body, { status: response.status, headers });
-  }
 
   return new Response(null, {
     status: 301,
@@ -157,9 +140,4 @@ export async function handleRetiredHost(entry, url, serveAssets, { mode, portalO
       'X-Robots-Tag': 'noindex, nofollow',
     },
   });
-}
-
-/** `notice` for the announced window, `redirect` after. See README. */
-export function retirementMode(env = {}) {
-  return env.RETIREMENT_MODE === 'redirect' ? 'redirect' : 'notice';
 }

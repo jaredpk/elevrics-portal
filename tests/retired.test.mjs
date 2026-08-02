@@ -1,13 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  RETIRED_HOSTS,
-  matchRetiredHost,
-  isMachinePath,
-  retiredTarget,
-  retirementMode,
-} from '../src/retired.js';
+import { RETIRED_HOSTS, matchRetiredHost, isMachinePath, retiredTarget } from '../src/retired.js';
 import { handleRequest } from '../src/router.js';
 
 const FINANCE = RETIRED_HOSTS['finance.elevrics.ai'];
@@ -17,7 +11,7 @@ function assetSpy() {
   const seen = [];
   const serve = async (req) => {
     seen.push(new URL(req.url).pathname);
-    return new Response('NOTICE', { status: 200, headers: { 'Content-Type': 'text/html' } });
+    return new Response('ASSET', { status: 200, headers: { 'Content-Type': 'text/html' } });
   };
   return { seen, serve };
 }
@@ -25,7 +19,6 @@ function assetSpy() {
 const on = (path, env = {}) =>
   handleRequest(new Request(`https://finance.elevrics.ai${path}`), assetSpy().serve, undefined, {
     PORTAL_ORIGIN: 'https://portal.elevrics.ai',
-    RETIREMENT_MODE: 'redirect',
     ...env,
   });
 
@@ -33,12 +26,6 @@ test('the retired host is recognised; the portal and parked hosts are not', () =
   assert.ok(matchRetiredHost('finance.elevrics.ai'));
   assert.equal(matchRetiredHost('portal.elevrics.ai'), null);
   assert.equal(matchRetiredHost('pathfinder.elevrics.ai'), null);
-});
-
-test('the mode defaults to the announced window, not to the silent redirect', () => {
-  assert.equal(retirementMode({}), 'notice');
-  assert.equal(retirementMode({ RETIREMENT_MODE: 'anything-else' }), 'notice');
-  assert.equal(retirementMode({ RETIREMENT_MODE: 'redirect' }), 'redirect');
 });
 
 test('a path maps one-to-one into the portal, query and all', () => {
@@ -49,6 +36,22 @@ test('a path maps one-to-one into the portal, query and all', () => {
   assert.equal(map('/accounts'), 'https://portal.elevrics.ai/finance/accounts');
   assert.equal(map('/budgets/2026?view=month'), 'https://portal.elevrics.ai/finance/budgets/2026?view=month');
   assert.equal(map('/assets/app.css'), 'https://portal.elevrics.ai/finance/assets/app.css');
+});
+
+test('the bare hostname redirects too — there is nobody to announce it to', async () => {
+  // An earlier pass served an interstitial here, behind a mode flag. The portal
+  // has one user, who made the decision; a notice page for an audience of zero
+  // is a page to maintain and a flag to remember to flip.
+  const { seen, serve } = assetSpy();
+  const response = await handleRequest(
+    new Request('https://finance.elevrics.ai/'),
+    serve,
+    undefined,
+    { PORTAL_ORIGIN: 'https://portal.elevrics.ai' },
+  );
+  assert.equal(response.status, 301);
+  assert.equal(response.headers.get('Location'), 'https://portal.elevrics.ai/finance');
+  assert.deepEqual(seen, [], 'a retired host should not reach the asset layer at all');
 });
 
 test('a deep link 301s, cached in the browser but not forever', async () => {
@@ -93,32 +96,6 @@ test('machine-path matching is case-insensitive and prefix-based', () => {
   // A human page that merely starts with the same letters must not be caught.
   assert.ok(!isMachinePath(FINANCE, '/apiary'));
   assert.ok(!isMachinePath(FINANCE, '/accounts'));
-});
-
-test('in notice mode only the bare hostname stops; deep links go straight through', async () => {
-  const { seen, serve } = assetSpy();
-  const env = { PORTAL_ORIGIN: 'https://portal.elevrics.ai', RETIREMENT_MODE: 'notice' };
-
-  const root = await handleRequest(
-    new Request('https://finance.elevrics.ai/'),
-    serve,
-    undefined,
-    env,
-  );
-  assert.equal(root.status, 200);
-  assert.deepEqual(seen, ['/finance-retired/']);
-  assert.equal(root.headers.get('X-Robots-Tag'), 'noindex, nofollow');
-
-  // Interrupting someone who followed a bookmark to a specific page with an
-  // announcement about the move turns a clean consolidation into an irritation.
-  const deep = await handleRequest(
-    new Request('https://finance.elevrics.ai/accounts'),
-    serve,
-    undefined,
-    env,
-  );
-  assert.equal(deep.status, 301);
-  assert.equal(deep.headers.get('Location'), 'https://portal.elevrics.ai/finance/accounts');
 });
 
 test('a retired host can NEVER reach an internal module', async () => {

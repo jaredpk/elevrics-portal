@@ -36,7 +36,7 @@
 import { MODULES, matchComingSoon, requiredRoleFor } from './modules.js';
 import { isDocumentRequest, viewerFor } from './chrome.js';
 import { renderComingSoon } from './nav.js';
-import { matchRetiredHost, handleRetiredHost, retirementMode } from './retired.js';
+import { matchRetiredHost, handleRetiredHost } from './retired.js';
 import { authConfig } from './auth/config.js';
 import { handleAuthRoute } from './auth/routes.js';
 import { readSession, withCookies } from './auth/session.js';
@@ -168,10 +168,7 @@ export async function handleRequest(request, serveAssets, injectChrome, env = {}
   // hostname itself didn't already.
   const retired = matchRetiredHost(url.hostname);
   if (retired) {
-    return handleRetiredHost(retired, url, serveAssets, {
-      mode: retirementMode(env),
-      portalOrigin: config.portalOrigin,
-    });
+    return handleRetiredHost(retired, url, { portalOrigin: config.portalOrigin });
   }
 
   // ---- Auth ----

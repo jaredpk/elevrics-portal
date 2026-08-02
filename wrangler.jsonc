@@ -35,12 +35,7 @@
     // Absolute base for redirect URIs, the assertion `iss`, and the retired-host
     // redirect target. A var rather than derived from the request host, because
     // it must not be steerable by a Host header.
-    "PORTAL_ORIGIN": "https://portal.elevrics.ai",
-
-    // finance.elevrics.ai. "notice" serves the retirement page on the BARE
-    // HOSTNAME only — deep links 301 straight through in both modes. Flip to
-    // "redirect" when the announced window closes; see README.
-    "RETIREMENT_MODE": "notice"
+    "PORTAL_ORIGIN": "https://portal.elevrics.ai"
   },
 
   // Login state is a sealed cookie and the session is a sealed cookie, so this

@@ -359,20 +359,23 @@ traffic arrive there and one blanket redirect breaks one of them:
 
 | Request | Answer |
 |---|---|
-| A deep link | **301** to the same path under `/finance` — the mapping is one-to-one, since finapp is prefix-passed-through and strips the prefix itself. `Cache-Control: max-age=86400` bounds the browser cache; a 301 with none is cached effectively forever. |
-| The bare hostname | The retirement notice while `RETIREMENT_MODE=notice`, then 301. **Only** the front page — interrupting a bookmark to a specific page with an announcement is an irritation. |
-| `/api/*`, `/webhook*`, `/mcp*`, `/oauth*`, `/.well-known/*`, `/health*` | **410 Gone**, naming `finapp-v3.fly.dev`. Never a redirect: a webhook POST sent at an authentication wall gets HTML back, which Plaid records as something other than an error while the transaction never lands. A 410 fails loudly at the caller instead. |
+| Anything a browser asks for | **301** to the same path under `/finance` — the mapping is one-to-one, since finapp is prefix-passed-through and strips the prefix itself. `Cache-Control: max-age=86400` bounds the browser cache; a 301 with none is cached effectively forever. |
+| `/api/*`, `/webhook*`, `/mcp*`, `/oauth*`, `/.well-known/*`, `/health*` | **410 Gone**, naming `finapp-v3.fly.dev`. Never a redirect: a webhook POST sent at an authentication wall gets HTML back, which Plaid records as something other than an error while the transaction never lands. A 410 fails loudly at the caller instead. Plaid and MCP are confirmed pointed at the Fly hostname, so this should never fire — it stays because ten lines against a silent financial-integration failure is a trade worth making. |
+
+There is **no retirement-notice interstitial**. An earlier pass had one behind a
+mode flag; the portal has one user, who made the decision, so it was a page to
+maintain and a flag to remember to flip for an audience of zero.
 
 Answered before any session check (being made to sign in to learn where something
 moved is hostile) and before any path routing (so a retired host can never proxy
 to an internal module — the same guard the parked hosts carry).
 
-**The cutover is not in this repo.** Route `finance.elevrics.ai` at this Worker,
-then remove the custom domain from `finapp-v3` on Fly, delete its Access
-application, and confirm the Plaid dashboard, `APP_URL`, `CORS_ORIGINS` and any
-OAuth/MCP client configs point at the Fly hostname. Keep the DNS record
-indefinitely — deleting it turns every old bookmark into a DNS error instead of a
-redirect. Full list in `docs/auth-architecture.md`.
+**The cutover is not in this repo, and it is optional.** None of the above runs
+until `finance.elevrics.ai` actually resolves to this Worker; without that, the
+code sits inert and the name simply stops working once it is removed from Fly.
+Pointing it here buys one thing: the browser autocompletes the old hostname from
+history for months, and routed, that muscle memory lands in `/finance` instead of
+on a DNS error. Steps in `docs/auth-architecture.md`.
 
 ---
 
