@@ -74,7 +74,22 @@ async function authenticate(config, body) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    return { ok: false, status: response.status, error: data.error ?? `HTTP ${response.status}` };
+    // WorkOS is not consistent about the shape here — OAuth-style
+    // `{error, error_description}` on the token path, API-style `{code,
+    // message}` elsewhere — so keep whichever fields exist rather than picking
+    // one and discarding the other. Throwing the body away is what made a real
+    // 400 unreadable: the status alone says "rejected" and nothing about why.
+    return {
+      ok: false,
+      status: response.status,
+      // A short machine code, safe to show: it names an OAuth failure mode, not
+      // anything about the account.
+      code: data.error ?? data.code ?? `http_${response.status}`,
+      // The human sentence. Log it; never render it — WorkOS is entitled to put
+      // whatever it likes in here.
+      detail: data.error_description ?? data.message ?? '',
+      body: data,
+    };
   }
   return { ok: true, data };
 }

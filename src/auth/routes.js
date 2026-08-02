@@ -172,14 +172,17 @@ async function finishLogin(request, url, config) {
 
   const result = await exchangeCode(config, code);
   if (!result.ok) {
-    // The overwhelmingly common cause is a WORKOS_API_KEY that doesn't match the
-    // environment the client id belongs to — including a key that was revoked
-    // and replaced without the new one being stored.
+    // WorkOS's own machine code, which is far more use than our HTTP status:
+    // `invalid_grant` (code spent, expired, or issued for a different
+    // redirect_uri) and `unauthorized_client` / `invalid_client` (the API key
+    // belongs to a different environment than the client id) have completely
+    // different fixes and both arrive as a 400.
+    console.error(`[auth] token exchange rejected: ${JSON.stringify(result.body ?? {})}`);
     return authError(
       'Sign-in could not be completed. Start again from the portal.',
       502,
       clearLoginState,
-      `exchange_failed_${result.status}`,
+      `exchange_${result.code}`,
     );
   }
 

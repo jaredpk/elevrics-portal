@@ -559,6 +559,40 @@ test('each callback failure carries its own reason code', async () => {
   );
 });
 
+test("a rejected token exchange reports WorkOS's own code, not just the status", async () => {
+  // `invalid_grant` (code spent, or issued for a different redirect_uri) and
+  // `unauthorized_client` (API key from another environment) both arrive as a
+  // 400 and have completely different fixes. The status alone cannot separate
+  // them, which is exactly what stalled a real cutover.
+  const config = authConfig(env());
+  const pending = await seal(
+    { state: 'st', next: '/', exp: Math.floor(Date.now() / 1000) + 60 },
+    SECRET,
+    'login',
+  );
+
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: 'invalid_grant', error_description: 'code expired' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+  try {
+    const url = new URL('https://portal.elevrics.ai/auth/callback?code=abc&state=st');
+    const response = await handleAuthRoute(
+      new Request(url, { headers: { Cookie: `${LOGIN_COOKIE}=${pending}` } }),
+      url,
+      config,
+    );
+    assert.equal(response.headers.get('X-Elevrics-Auth-Error'), 'exchange_invalid_grant');
+    // The provider's prose is logged, never rendered.
+    assert.ok(!(await response.text()).includes('code expired'));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test('the reason never leaks whether an account exists', async () => {
   // Every code names a branch of routes.js. None is derived from the identity
   // being signed in, so probing with a real address tells you nothing.
