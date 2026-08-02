@@ -1,0 +1,44 @@
+# WorkOS environment configuration, as code.
+#
+# Apply with:  workos seed --file workos-seed.yml
+#
+# This exists so the WorkOS side of the auth setup is reviewable next to the
+# code that depends on it, rather than being a thing someone clicked in a
+# dashboard once and can no longer describe. Every value here is load-bearing
+# for a specific line in src/auth/, noted below.
+#
+# Not secrets. The client id and API key are set with `wrangler secret put` and
+# never appear in this repo — see README.
+
+config:
+  # Where AuthKit sends the browser back after a successful sign-in.
+  # Must match `authorizationUrl()` in src/auth/workos.js EXACTLY, trailing
+  # slash included: WorkOS does a literal string comparison and rejects
+  # anything else.
+  #
+  # /signed-out/ is listed for a different reason — src/auth/routes.js sends
+  # WorkOS a `return_to` of that path when ending a session, and WorkOS will
+  # only honour a return_to it already knows about. Without it, sign-IN works
+  # perfectly and sign-OUT errors, which reads as a bug in our code and isn't.
+  # It is safe to list: /signed-out/ is a static page that never reads a query
+  # parameter, so it cannot do anything with an authorization code.
+  redirect_uris:
+    - https://portal.elevrics.ai/auth/callback
+    - https://portal.elevrics.ai/signed-out/
+
+  # The portal is the only origin that ever talks to WorkOS from a browser.
+  cors_origins:
+    - https://portal.elevrics.ai
+
+  homepage_url: https://portal.elevrics.ai
+
+# Roles. `member` is the default for any new account; `admin` is what
+# `requiresRole` on /admin checks for in src/modules.js.
+#
+# The admin-safe direction matters here: an account with no role at all is
+# denied by src/auth/guard.js, not allowed. Granting `admin` is deliberate.
+roles:
+  - name: Member
+    slug: member
+  - name: Admin
+    slug: admin
