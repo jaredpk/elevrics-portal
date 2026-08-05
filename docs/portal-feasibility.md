@@ -3,6 +3,15 @@
 **Date:** July 2026
 **Question:** Replace per-product subdomains (`solayard.elevrics.ai`, `pathfinder.elevrics.ai`, …) with a single portal that keeps the marketing site separate, hosts the existing tools as modules, and eventually supports multi-tenant client logins.
 
+> **Superseded on the auth question (August 2026).** This assessment recommends
+> one Cloudflare Access application over `*.elevrics.ai` as the phase-1 login,
+> and names WorkOS as the right call for the multi-tenant tier later. That later
+> call was brought forward: the portal runs its own WorkOS accounts and there is
+> no Access application any more. `docs/auth-architecture.md` is the current
+> answer for anything about identity, sessions, roles or per-client logins. The
+> rest of this document — the module inventory, the routing analysis and the
+> effort estimates — still stands.
+
 ---
 
 ## Verdict

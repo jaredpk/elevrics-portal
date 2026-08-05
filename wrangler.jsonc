@@ -21,17 +21,11 @@
     "run_worker_first": true
   },
 
+  // There is no AUTH_MODE. The WorkOS session is the only login — Cloudflare
+  // Access is gone — and the flag that sequenced the move between them ('access'
+  // → 'shadow' → 'enforce') would now be a var that can turn authentication off.
+  // See src/auth/config.js.
   "vars": {
-    // Rollout state for portal-owned accounts. See src/auth/config.js — the
-    // ordering constraint (portal auth → origins accept its assertion → Access
-    // comes off) is why this is a flag and not a branch.
-    //   access  — Cloudflare Access only, /auth/* not mounted
-    //   shadow  — portal sessions live and displayed, Access still authoritative
-    //   enforce — portal session required; Access can be removed
-    // Committed as "shadow" deliberately: deploying this repo must never be the
-    // thing that starts refusing requests.
-    "AUTH_MODE": "shadow",
-
     // Absolute base for redirect URIs, the assertion `iss`, and the retired-host
     // redirect target. A var rather than derived from the request host, because
     // it must not be steerable by a Host header.
@@ -48,7 +42,9 @@
   //   { "binding": "AUTH_KV", "id": "<id from the command above>" }
   // ],
 
-  // Secrets — set with `npx wrangler secret put <NAME>`, never in this file:
+  // Secrets — set with `npx wrangler secret put <NAME>`, never in this file.
+  // The first three are REQUIRED: without them the portal cannot mint a session,
+  // and every non-public path answers 503 rather than falling open.
   //   WORKOS_CLIENT_ID        AuthKit client id
   //   WORKOS_API_KEY          AuthKit secret key
   //   SESSION_SECRET          HKDF input for the session-cookie key (32+ bytes)

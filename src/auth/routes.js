@@ -259,11 +259,6 @@ function escapeHtml(value) {
 export async function handleAuthRoute(request, url, config) {
   if (!isAuthRoute(url.pathname)) return null;
 
-  // In 'access' mode these routes do not exist. A 404 rather than a redirect:
-  // half-mounted auth is worse than none, and the mode flag exists precisely so
-  // this state is explicit.
-  if (!config.enabled) return new Response('Not found', { status: 404 });
-
   const missing = configErrors(config);
   if (missing.length) {
     // 503 not 500: this is configuration that has not landed yet, and the

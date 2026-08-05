@@ -164,27 +164,25 @@ cat <<'NEXT'
 
   All four are set. A deploy takes a moment to pick them up.
 
-  WHAT TO EXPECT, and why it looks like nothing changed:
+  These are not optional. WorkOS is the only login — Cloudflare Access is
+  gone — so a deploy missing any of the first three answers 503 on every
+  page and names the one it is missing. It fails closed rather than open,
+  which is the right way round, but it does mean nobody gets in until all
+  four are present.
 
-  Cloudflare Access still sits in front of the whole hostname, so it
-  intercepts every request before the Worker runs — including the new
-  sign-in. curl cannot see past it, which is why there is no command here
-  that verifies the end result.
-
-  So, in a browser:
+  Check it from a browser:
 
     1. Open  https://portal.elevrics.ai/
-       Log in with the emailed code, exactly as you always have.
-       That is Cloudflare Access. It has not changed yet.
+       You should be sent straight to a WorkOS sign-in screen.
 
-    2. Then open  https://portal.elevrics.ai/auth/login
-       This should be a WorkOS screen. Create your account there.
+    2. Sign in (or create the account, if this is the first time).
+       You should land back on the page you asked for, not on "/".
 
-    3. Back on the portal, the bottom of the left rail should show your
-       email and a sign-out button.
+    3. The bottom of the left rail should show your email and a sign-out
+       button.
 
-  Two logins for now. That is the point: Access stays in front until the
-  four modules accept the portal's own token, so nothing you do here can
-  lock you out.
+  And from a terminal, which now sees the same thing a browser does:
+
+    curl -sI https://portal.elevrics.ai/ | head -1     # 302 to /auth/login
 
 NEXT

@@ -79,22 +79,18 @@ const SIGNOUT_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 /**
  * Who is signed in, at the foot of the rail.
  *
- * Takes either a bare email string (the Cloudflare Access header, which is all
- * there was) or `{ email, name, signOut, impersonator }` for a portal account.
- * Both shapes, rather than a migration, because both are live at once for the
- * length of the 'shadow' rollout — see src/auth/config.js.
+ * Takes `{ email, name, impersonator }` — a portal session, and only that. It
+ * used to also accept a bare email string, which was the Cloudflare Access
+ * header: an identity the portal was handed rather than one it established.
+ * With Access gone there is exactly one source, so there is exactly one shape,
+ * and a footer implies a session that can be signed out of.
  *
- * The Access header remains DISPLAY ONLY and must never gate anything: the
- * router is a convenience layer for as long as Access is the thing enforcing,
- * and a header that decided what you can see would quietly contradict that.
- * A portal session is different — it is verified server-side before this markup
- * is ever produced — but the rail still only renders it, and everything goes
- * through esc() regardless.
+ * The rail still only RENDERS an identity — it never gates on one. Everything
+ * here goes through esc() regardless of where it came from.
  */
 function viewerFoot(viewer) {
   if (!viewer) return '';
-  const { email, signOut = false, impersonator = null } =
-    typeof viewer === 'string' ? { email: viewer } : viewer;
+  const { email, impersonator = null } = viewer;
   if (!email) return '';
 
   const initial = email.trim().charAt(0).toUpperCase() || '?';
@@ -103,13 +99,11 @@ function viewerFoot(viewer) {
   // fires from any <img> on any page and gets triggered speculatively by link
   // prefetchers; being signed out by a page you merely looked at is a real bug.
   // With SameSite=Lax on the session cookie, POST-only is also the CSRF defence.
-  const signOutControl = signOut
-    ? `<form class="elv-rail-signout" method="POST" action="/auth/logout">
+  const signOutControl = `<form class="elv-rail-signout" method="POST" action="/auth/logout">
       <button type="submit" title="Sign out" aria-label="Sign out">
         ${SIGNOUT_GLYPH}
       </button>
-    </form>`
-    : '';
+    </form>`;
 
   // An admin browsing as someone else must never look identical to that person
   // being signed in. Loud on purpose.

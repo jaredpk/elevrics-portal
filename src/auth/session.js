@@ -49,7 +49,11 @@ export function signOutCookie() {
  * ahead of an asset response, a proxied response and a redirect.
  */
 export async function readSession(request, config) {
-  if (!config.enabled || !config.sessionSecret) return { session: null, cookies: [] };
+  // No key, nothing to unseal with. Returning "signed out" here is NOT a
+  // fallback to unauthenticated access: the guard, which runs after this,
+  // refuses the request outright when a secret is missing rather than treating a
+  // null session as an anonymous visitor. See `configErrors` in guard.js.
+  if (!config.sessionSecret) return { session: null, cookies: [] };
 
   const raw = readCookie(request, SESSION_COOKIE);
   if (!raw) return { session: null, cookies: [] };

@@ -8,9 +8,11 @@
 > deployed app to answer, and the per-module flag is what makes shipping the
 > other two without it possible.
 >
-> Phase 3 landed the access indicator and the coming-soon machinery, minus a
-> sign-out control: `/cdn-cgi/access/logout` is edge-handled before the Worker
-> runs and cannot be verified locally.
+> Phase 3 landed the identity indicator and the coming-soon machinery. It
+> shipped without a sign-out control, because under Cloudflare Access
+> `/cdn-cgi/access/logout` was edge-handled before the Worker ran and could not
+> be verified locally. That is resolved: the portal owns its accounts now, and
+> the rail carries a real POST sign-out. See `docs/auth-architecture.md`.
 >
 > Beyond the plan: a `⌘K` quick switcher, which is the navigational half of
 > what Phase 4's ask-box was partly serving and needs no data pipeline to be
@@ -237,12 +239,15 @@ pathfinder resists, it ships uninjected and waits for Phase 4 / approach C.
 
 ### Phase 3 — The completeness moves (½–1 day)
 
-- **Access indicator.** Cloudflare Access sets `Cf-Access-Authenticated-User-Email`
-  on requests reaching the Worker — verify it arrives, then render "signed in as
-  …" at the foot of the rail. This is the concept's item 6 for near-zero effort,
-  and it makes the auth story visible instead of asserted. Keep it display-only;
-  the README is emphatic that the router is not a security boundary, and this
-  changes nothing about that.
+- **Access indicator.** Render "signed in as …" at the foot of the rail. This is
+  the concept's item 6 for near-zero effort, and it makes the auth story visible
+  instead of asserted. Keep it display-only.
+
+  *As shipped, and since revised:* this originally read
+  `Cf-Access-Authenticated-User-Email`, which Cloudflare Access set on every
+  request reaching the Worker. With Access removed, that header is client-typed
+  and is ignored; the footer renders from the portal session instead — which is
+  also what let the sign-out control exist.
 - **Branded coming-soon pages** for any registry entry with
   `status: 'coming_soon'`, using the Phase 1 hero band — the same treatment the
   existing `public/pathfinder-coming-soon/` placeholder gets, so the parked host

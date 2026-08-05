@@ -207,14 +207,14 @@ unprefixed.
 ### Finance keeps machine callers on the Fly hostname
 
 `finapp-v3` receives Plaid webhooks, serves an MCP endpoint, and runs its own
-OAuth server. None of those callers can present an Access token, so they keep
+OAuth server. None of those callers can present a portal assertion, so they keep
 hitting `finapp-v3.fly.dev` unprefixed — the same split SolaYard already uses
 for its GitHub Actions cron. `APP_URL` stays on the Fly hostname, so the OAuth
 issuer is stable and no MCP client has to re-authorize.
 
-Its Supabase login was removed rather than stacked under Access: the app has no
-user model (hardcoded allowed email, identity never read downstream), so Access
-replaces it and one portal sign-in covers every module.
+Its Supabase login was removed rather than stacked underneath: the app has no
+user model (hardcoded allowed email, identity never read downstream), so the
+portal sign-in replaces it and one login covers every module.
 
 ### Parked hosts
 
@@ -226,38 +226,45 @@ lives at `portal.elevrics.ai/pathfinder` and is unrelated.
 Parked hosts are matched **before** any path routing, so a public hostname can
 never reach an internal module — without that guard,
 `pathfinder.elevrics.ai/solayard` would proxy to the internal dashboard. The
-origin would still reject it for carrying no Access token, but it would confirm
-to an anonymous visitor that the module exists. Asserted in `tests/`.
+origin would still reject it for carrying no portal assertion, but it would
+confirm to an anonymous visitor that the module exists. Asserted in `tests/`.
 
-No Access application covers a parked host — that is the point. Do not add one.
+A parked host is answered before the sign-in gate and serves nothing but its
+placeholder — that is the point. Do not put a login in front of one.
 
 ---
 
 ## Authentication
 
-The portal is moving from Cloudflare Access (emailed one-time codes, no user
-model) to **portal-owned accounts on WorkOS AuthKit**. `docs/auth-architecture.md`
-is the full assessment, recommendation and rollout; this is the operating
-summary.
+**One login: portal-owned accounts on WorkOS AuthKit.** The portal used to sit
+behind a Cloudflare Access application as well — emailed one-time codes, no user
+model — so signing in meant doing it twice. Access is gone.
+`docs/auth-architecture.md` is the full assessment and the rollout that got here;
+this is the operating summary.
 
-### The one constraint that shapes everything
+### There is no mode in which auth is off
+
+The `AUTH_MODE` flag (`access` → `shadow` → `enforce`) existed to sequence the
+move off Access, and it went with it. A three-state gate whose two permissive
+states are no longer reachable is a foot-gun with an environment variable
+attached: the one setting you never want reachable by accident is
+"authentication off". Enforcement is a property of the code now, not of the
+deploy.
+
+What replaces it as the safety net is failing **closed and legibly**. A deploy
+missing `WORKOS_CLIENT_ID`, `WORKOS_API_KEY` or `SESSION_SECRET` cannot mint a
+session, so every non-public path answers `503 auth_not_configured` naming the
+missing secret — rather than redirecting to a sign-in that cannot complete, and
+emphatically rather than falling open the way an unconfigured deploy used to.
+
+### The constraint that shaped the cutover
 
 Every Fly origin verifies its own token, because the Fly hostnames stay publicly
-reachable and a direct hit on `*.fly.dev` has to be rejected *there*. So the
-moment Access comes off `portal.elevrics.ai`, the origins stop receiving
-`Cf-Access-Jwt-Assertion` and reject everything — unless they have already been
-taught to accept something else first.
-
-That ordering is what `AUTH_MODE` exists to express:
-
-| Mode | State |
-|---|---|
-| `access` | As before. Access gates at the edge, `/auth/*` is not mounted. The escape hatch. |
-| `shadow` | `/auth/*` is live, a portal session is honoured and shown, the assertion is minted — but Access is still in front and still authoritative. **Nothing is blocked by the portal.** Migrate the origins from here. |
-| `enforce` | The portal session is required. Access can now be removed. |
-
-Committed default is `shadow`: deploying this repo must never be the thing that
-starts refusing requests.
+reachable and a direct hit on `*.fly.dev` has to be rejected *there*. Taking
+Access off `portal.elevrics.ai` stopped the origins receiving
+`Cf-Access-Jwt-Assertion`, so each one had to accept the portal's own assertion
+first — see below. That property has not changed and must not: **the router is a
+security boundary now, but it is not the only one.**
 
 ### What the portal owns, and what it doesn't
 
@@ -284,13 +291,13 @@ by link prefetchers — and it ends the AuthKit session too, not just ours.
 sessions at their next refresh, i.e. within minutes rather than instantly. That
 bound is the trade for having no session table.
 
-### The module assertion — what replaces the Access JWT
+### The module assertion — what replaced the Access JWT
 
 The router mints `X-Elevrics-Assertion`: an ES256 JWT, 120 seconds, `aud` set to
 the module's routing prefix, with the public keys at
-`/.well-known/portal-jwks.json`. An origin swaps its Access verifier for this
-one — fetch a JWKS, check signature, `iss`, `aud`, `exp` — which is a
-substitution in code that already exists, not a new code path.
+`/.well-known/portal-jwks.json`. Each origin swapped its Access verifier for this
+one — fetch a JWKS, check signature, `iss`, `aud`, `exp` — a substitution in code
+that already existed, not a new code path.
 
 Two properties are load-bearing:
 
@@ -303,8 +310,11 @@ Two properties are load-bearing:
 `ASSERTION_SIGNING_KEY_NEXT` is published alongside during rotation, so rotating
 is a sequence rather than an outage.
 
-**The router is still not the only boundary, and must not become one.** Every
-origin keeps verifying for itself.
+**The router is not the only boundary, and must not become one.** Every origin
+keeps verifying for itself — `*.fly.dev` is still reachable directly.
+
+`ASSERTION_SIGNING_KEY` is therefore not optional in practice: without it no
+assertion is minted, and an origin that verifies properly rejects the request.
 
 ### Roles
 
@@ -408,20 +418,18 @@ substring. A screenshot caught the second one too: a `coming_soon` chip
 rendering its raw status, unstyled and wide enough to truncate the label beside
 it. Look at the pages, not only the assertions.
 
-To exercise the identity footer locally, send the header `wrangler dev` has no
-Access in front of it to set:
-
-```bash
-curl -H 'Cf-Access-Authenticated-User-Email: you@elevrics.ai' \
-     -H 'Sec-Fetch-Dest: document' http://127.0.0.1:8788/solayard
-```
+There is no header that fakes an identity any more. `Cf-Access-Authenticated-User-Email`
+used to be read for the rail's footer, because Access set it and nothing else
+could; with Access gone it is a header anyone can type, so it is ignored. The
+only way to be a viewer is to hold a session, which is why `wrangler dev` shows
+no footer and why `npm run harness` mints itself a real sealed cookie with a
+per-process secret rather than running with auth off (there is no "off").
 
 The auth layer is unit-tested in Node (Web Crypto is a global in Node ≥ 20, so
 sealing, the assertion and the guard all run without wrangler). What needs a
 deploy is the part that talks to WorkOS — `wrangler dev` can reach the API with
 real secrets in `.dev.vars`, but the redirect URI has to be a real hostname, so
-the sign-in round trip is verified in `shadow` mode against the deployed Worker
-with Access still in front. That is what `shadow` is for.
+the sign-in round trip is only verifiable against the deployed Worker.
 
 The retired host is testable locally without DNS, since it is matched on the
 `Host` header:
@@ -465,9 +473,9 @@ limit.
 
 One-time Cloudflare setup:
 1. Point `portal.elevrics.ai` at this Worker.
-2. Create one Access application for `portal.elevrics.ai`, policy: your email.
-   **Keep it until `AUTH_MODE=enforce` has been exercised** — it is the thing
-   that stops a bad auth deploy from being a lockout.
+2. Set the four auth secrets (`npm run setup:auth`). The portal serves nothing
+   without them — there is no Access application in front any more, so a deploy
+   missing a secret answers 503 rather than falling back to an edge login.
 3. Set `URL_PREFIX` on the two prefix-stripped Fly apps
    (`fly secrets set URL_PREFIX=/solayard`, `.../opportunities`).
 4. Add a rate-limiting rule on `/auth/*` (see Authentication above — the
@@ -476,19 +484,19 @@ One-time Cloudflare setup:
    The parked-host and retired-host guards are both host-matched, so neither
    does anything until the hostname actually arrives here.
 
-The auth cutover, in order — each step is reversible, and skipping to the last
-one is the way to lock everyone out:
+**Do not add an Access application back in front of `portal.elevrics.ai`.** It
+would be a second login on top of the one that is now authoritative, and the
+origins no longer verify its token.
 
-1. Configure the WorkOS secrets and deploy with `AUTH_MODE=shadow`. Sign in at
-   `/auth/login`; the rail shows the portal account and a sign-out control.
-   Access is still enforcing, so nothing can break.
-2. Set `ASSERTION_SIGNING_KEY` and confirm `/.well-known/portal-jwks.json`.
-3. Migrate the origins one at a time: accept the portal assertion *in addition
-   to* the Access token. Verify each while Access is still in front.
-4. Flip to `AUTH_MODE=enforce`. Verify sign-in, sign-out, `/admin/` as a
-   non-admin, and one module deep link.
-5. Only now remove the Access application, and drop the Access branch from the
-   origins.
+### If sign-in is broken and you are locked out
+
+There is deliberately no bypass flag — one would be a code path in the deployed
+Worker that turns authentication off, which is worse than the outage it fixes.
+The recovery is `npx wrangler tail` (the callback logs a short `reason` for every
+refusal, and `X-Elevrics-Auth-Error` carries the same value on the response) plus
+`npx wrangler rollback` to the previous deployment. `npm run setup:auth` is safe
+to re-run; it rotates the two generated secrets, which signs out existing
+sessions and nothing else.
 
 ---
 

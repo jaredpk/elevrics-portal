@@ -108,10 +108,11 @@ test('a retired host can NEVER reach an internal module', async () => {
   }
 });
 
-test('the retired host answers without a session, in enforce mode', async () => {
+test('the retired host answers without a session', async () => {
   // Being made to sign in before being told where something moved is hostile,
-  // and a redirect discloses nothing the hostname didn't already.
-  const response = await on('/accounts', { AUTH_MODE: 'enforce', SESSION_SECRET: 'x'.repeat(40) });
+  // and a redirect discloses nothing the hostname didn't already. The gate is
+  // unconditional now, so this only holds because the host check comes first.
+  const response = await on('/accounts', { SESSION_SECRET: 'x'.repeat(40) });
   assert.equal(response.status, 301);
 });
 

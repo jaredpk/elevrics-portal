@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { isDocumentRequest, viewerFor } = await import('../src/chrome.js');
+const { isDocumentRequest } = await import('../src/chrome.js');
 const { matchComingSoon } = await import('../src/modules.js');
+const { authConfig } = await import('../src/auth/config.js');
+const { sessionCookie } = await import('../src/auth/session.js');
 const router = await import('../src/router.js');
 const {
   matchModule,
@@ -12,6 +14,47 @@ const {
   handleRequest,
   MODULES,
 } = router;
+
+/**
+ * Everything on the portal host needs a session now.
+ *
+ * These are routing tests, not auth tests, but the gate is unconditional since
+ * the Cloudflare Access login came off — there is no "auth not configured, so
+ * carry on" state left to lean on, and there should not be. So they sign in for
+ * real: a genuinely sealed cookie read by the genuine `readSession`. That costs
+ * two lines and means the routing under test is the routing a signed-in user
+ * actually gets, rather than a path only reachable with auth switched off.
+ *
+ * `admin` is in the roles because `/admin/` declares `requiresRole: 'admin'` and
+ * several of these route through it.
+ */
+const ENV = {
+  SESSION_SECRET: 'router-test-secret-that-is-long-enough-to-be-a-key',
+  WORKOS_CLIENT_ID: 'client_test',
+  WORKOS_API_KEY: 'sk_test',
+  PORTAL_ORIGIN: 'https://portal.elevrics.ai',
+};
+
+async function signedIn(url, init = {}) {
+  const now = Math.floor(Date.now() / 1000);
+  const value = await sessionCookie(
+    {
+      sub: 'user_01',
+      email: 'jared@elevrics.ai',
+      roles: ['admin'],
+      sid: 'session_01',
+      accessToken: 'header.payload.sig',
+      refreshToken: 'refresh_01',
+      // Far future, so `readSession` never tries to refresh against real WorkOS.
+      accessExp: now + 3600,
+      iat: now,
+    },
+    authConfig(ENV),
+  );
+  const headers = new Headers(init.headers ?? {});
+  headers.set('Cookie', value.split(';')[0]);
+  return new Request(url, { ...init, headers });
+}
 
 /**
  * Assert a collection is non-empty before iterating it. A `for` loop over
@@ -63,7 +106,7 @@ test('the placeholder is served noindex', async () => {
 
 test('the portal host still falls through to assets for non-module paths', async () => {
   const { seen, serve } = assetSpy();
-  await handleRequest(new Request('https://portal.elevrics.ai/admin/'), serve);
+  await handleRequest(await signedIn('https://portal.elevrics.ai/admin/'), serve, undefined, ENV);
   assert.deepEqual(seen, ['/admin/']);
 });
 
@@ -147,23 +190,18 @@ test('chrome is injected into the portal\'s own pages', async () => {
     calls.push(ctx);
     return response;
   };
-  await handleRequest(new Request('https://portal.elevrics.ai/admin/'), serve, inject);
-  assert.deepEqual(calls, [{ pathname: '/admin/', mode: 'placeholder', viewer: null }]);
+  await handleRequest(await signedIn('https://portal.elevrics.ai/admin/'), serve, inject, ENV);
+  assert.deepEqual(calls, [
+    { pathname: '/admin/', mode: 'placeholder', viewer: { email: 'jared@elevrics.ai', name: undefined, impersonator: undefined } },
+  ]);
 });
 
 // ---- Who is signed in ----
 
-test('the Access identity is read off the request, and is absent locally', () => {
-  const withHeader = new Request('https://portal.elevrics.ai/', {
-    headers: { 'Cf-Access-Authenticated-User-Email': 'jared@elevrics.ai' },
-  });
-  assert.equal(viewerFor(withHeader), 'jared@elevrics.ai');
-  // No Access in front of `wrangler dev` — the rail shows no footer at all
-  // rather than an empty one.
-  assert.equal(viewerFor(new Request('https://portal.elevrics.ai/')), null);
-});
-
-test('the viewer reaches both the portal pages and the proxied modules', async () => {
+test('an identity header on the request is never trusted as a viewer', async () => {
+  // `Cf-Access-Authenticated-User-Email` used to be read here, because Access
+  // set it and nothing else could. With Access gone it is just a header a client
+  // can type, so the rail must show nothing rather than whatever it says.
   const { serve } = assetSpy();
   const seen = [];
   const inject = (response, ctx) => {
@@ -171,11 +209,11 @@ test('the viewer reaches both the portal pages and the proxied modules', async (
     return response;
   };
   const headers = {
-    'Cf-Access-Authenticated-User-Email': 'jared@elevrics.ai',
+    'Cf-Access-Authenticated-User-Email': 'attacker@evil.test',
     'Sec-Fetch-Dest': 'document',
   };
-  await handleRequest(new Request('https://portal.elevrics.ai/', { headers }), serve, inject);
-  assert.deepEqual(seen, ['jared@elevrics.ai']);
+  await handleRequest(new Request('https://portal.elevrics.ai/', { headers }), serve, inject, ENV);
+  assert.deepEqual(seen, []);
 });
 
 test('chrome is never injected into a parked host', async () => {
@@ -191,7 +229,7 @@ test('chrome is never injected into a parked host', async () => {
 
 test('the router routes identically with no injector supplied', async () => {
   const { seen, serve } = assetSpy();
-  const res = await handleRequest(new Request('https://portal.elevrics.ai/admin/'), serve);
+  const res = await handleRequest(await signedIn('https://portal.elevrics.ai/admin/'), serve, undefined, ENV);
   assert.equal(await res.text(), 'ASSET');
   assert.deepEqual(seen, ['/admin/']);
 });
@@ -239,7 +277,7 @@ test('an unbuilt module is never proxied, and never shadows a real one', async (
 test('an unbuilt module serves a branded page instead of a 404', async () => {
   await withComingSoon(async () => {
     const { seen, serve } = assetSpy();
-    const res = await handleRequest(new Request('https://portal.elevrics.ai/demands'), serve);
+    const res = await handleRequest(await signedIn('https://portal.elevrics.ai/demands'), serve, undefined, ENV);
     const body = await res.text();
     assert.equal(res.status, 200);
     assert.match(res.headers.get('Content-Type') ?? '', /text\/html/);
@@ -254,7 +292,7 @@ test('an unbuilt module serves a branded page instead of a 404', async () => {
 
 test('an unknown path is still a plain 404 from the assets binding', async () => {
   const { seen, serve } = assetSpy();
-  await handleRequest(new Request('https://portal.elevrics.ai/nope'), serve);
+  await handleRequest(await signedIn('https://portal.elevrics.ai/nope'), serve, undefined, ENV);
   assert.deepEqual(seen, ['/nope'], 'a miss was answered with a coming-soon page');
 });
 

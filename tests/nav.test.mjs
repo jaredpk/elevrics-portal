@@ -225,42 +225,40 @@ test('the switcher has a list to read: every rail link is labelled', () => {
 // ---- Who is signed in ----
 
 test('the rail names the signed-in viewer', () => {
-  const html = renderRail('/', 'jared@elevrics.ai');
+  const html = renderRail('/', { email: 'jared@elevrics.ai' });
   assert.match(html, /elv-rail-viewer-email[^>]*>jared@elevrics\.ai</);
   assert.match(html, /elv-rail-avatar" aria-hidden="true">J</, 'no collapsed marker');
 });
 
 test('no identity means no footer, not an empty one', () => {
-  // Local dev has no Access in front of it. A blank "Signed in as" reads as a
-  // bug; an absent one reads as local.
+  // `wrangler dev` has no session and nothing in front of it to invent one. A
+  // blank "Signed in as" reads as a bug; an absent one reads as local.
   assert.doesNotMatch(renderRail('/', null), /elv-rail-foot/);
   assert.doesNotMatch(renderRail('/'), /elv-rail-foot/);
 });
 
 test('the identity is escaped like everything else', () => {
-  // Display-only and Access-set, but it is the one value in the rail that does
-  // not come from our own registry.
-  const html = renderRail('/', '<img src=x onerror=alert(1)>@evil.test');
+  // Server-verified before it ever reaches here, but it is the one value in the
+  // rail that does not come from our own registry.
+  const html = renderRail('/', { email: '<img src=x onerror=alert(1)>@evil.test' });
   assert.doesNotMatch(html, /<img/);
   assert.match(html, /&lt;img/);
 });
 
-test('a portal account gets a sign-out control; the Access header does not', () => {
-  // Both shapes are live at once for the length of the rollout — the string is
-  // the Cloudflare Access header, the object is a portal session. Only the
-  // latter has anything to sign out OF.
-  const account = renderRail('/', { email: 'jared@elevrics.ai', signOut: true });
+test('a footer means a portal session, so it always offers sign-out', () => {
+  // There is one identity source now. The bare-string shape was the Cloudflare
+  // Access header — an identity with nothing to sign out OF — and it is gone
+  // with the login that set it.
+  const account = renderRail('/', { email: 'jared@elevrics.ai' });
   assert.match(account, /elv-rail-viewer-email[^>]*>jared@elevrics\.ai</);
   assert.match(account, /<form class="elv-rail-signout" method="POST" action="\/auth\/logout">/);
-
-  assert.doesNotMatch(renderRail('/', 'jared@elevrics.ai'), /elv-rail-signout/);
 });
 
 test('sign-out is a POST form, never a link', () => {
   // A GET sign-out fires from any <img> on any page and gets triggered
   // speculatively by link prefetchers. Being signed out by a page you merely
   // looked at is a real bug, not a theoretical one.
-  const html = renderRail('/', { email: 'jared@elevrics.ai', signOut: true });
+  const html = renderRail('/', { email: 'jared@elevrics.ai' });
   assert.doesNotMatch(html, /<a[^>]+href="\/auth\/logout"/);
   assert.match(html, /<button type="submit"[^>]*aria-label="Sign out"/);
 });
@@ -268,7 +266,6 @@ test('sign-out is a POST form, never a link', () => {
 test('impersonation does not look like an ordinary session', () => {
   const html = renderRail('/', {
     email: 'someone@client.example',
-    signOut: true,
     impersonator: 'jared@elevrics.ai',
   });
   assert.match(html, /elv-rail-impersonating[^>]*>Viewing as</);

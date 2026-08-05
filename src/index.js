@@ -14,8 +14,9 @@ import { makeChromeInjector } from './chrome.js';
  * work without it.
  *
  * `env` is passed through for the same dependency-injection reason: the auth
- * layer reads its secrets, its KV binding and its mode flag from it, and the
- * unit tests hand in a plain object instead.
+ * layer reads its secrets and its KV binding from it, and the unit tests hand in
+ * a plain object instead. Nothing in it can switch authentication off — a
+ * request whose env is missing a WorkOS secret is refused, not waved through.
  */
 const injectChrome = makeChromeInjector(HTMLRewriter);
 

@@ -110,17 +110,6 @@ export function makeChromeInjector(HTMLRewriterCtor) {
 }
 
 /**
- * The header Cloudflare Access sets on every request it lets through.
- *
- * Absent in local dev (`wrangler dev` is not behind Access), which is why the
- * rail renders no footer at all rather than an empty "Signed in as" — a blank
- * identity reads as a bug, and an absent one reads as local.
- */
-export function viewerFor(request) {
-  return request.headers.get('Cf-Access-Authenticated-User-Email');
-}
-
-/**
  * Is this a top-level page load, rather than a fetch for a fragment?
  *
  * A proxied Flask or Express app may answer XHR with `text/html` partials, and

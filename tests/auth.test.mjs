@@ -27,7 +27,6 @@ async function testKey() {
 }
 
 const env = (extra = {}) => ({
-  AUTH_MODE: 'enforce',
   SESSION_SECRET: SECRET,
   WORKOS_CLIENT_ID: 'client_test',
   WORKOS_API_KEY: 'sk_test',
@@ -190,12 +189,38 @@ test('a navigation is redirected to sign in; a fetch gets a 401', () => {
   assert.match(xhr.headers.get('Content-Type'), /json/);
 });
 
-test('the gate does nothing outside enforce mode', () => {
-  for (const mode of ['access', 'shadow']) {
+test('there is no mode in which the gate stands down', () => {
+  // The AUTH_MODE ladder is gone along with the Cloudflare Access login it was
+  // sequencing. An unknown var must not be able to reintroduce it.
+  for (const mode of ['access', 'shadow', 'off', '']) {
     const config = authConfig(env({ AUTH_MODE: mode }));
     const url = new URL('https://portal.elevrics.ai/finance');
-    assert.equal(gate(new Request(url), url, null, { config }), null, mode);
+    const response = gate(
+      new Request(url, { headers: { 'Sec-Fetch-Dest': 'document' } }),
+      url,
+      null,
+      { config },
+    );
+    assert.ok(response, `AUTH_MODE=${mode} let an anonymous request through`);
+    assert.equal(response.status, 302, `AUTH_MODE=${mode}`);
   }
+});
+
+test('a deploy missing its WorkOS secrets fails closed, and says which', () => {
+  // With nothing else in front of the portal, this is the case that used to be
+  // covered by Access still being there. It must not be a redirect into a
+  // sign-in that cannot complete, and it must never be a pass.
+  const config = authConfig({ SESSION_SECRET: SECRET });
+  const url = new URL('https://portal.elevrics.ai/finance');
+  const response = gate(new Request(url, { headers: { 'Sec-Fetch-Dest': 'document' } }), url, null, {
+    config,
+  });
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+
+  // Still open where it has to be: /auth/* and the sign-out page answer, so the
+  // 503 is legible at the login route too rather than shadowing it.
+  assert.equal(gate(new Request(url), new URL('https://portal.elevrics.ai/auth/login'), null, { config }), null);
 });
 
 test('a signed-in account without the role gets 403, not a second sign-in', () => {
@@ -216,15 +241,8 @@ test('auth routes are recognised before any module could shadow them', () => {
   assert.ok(!isAuthRoute('/authors'));
 });
 
-test('/auth/* does not exist in access mode', async () => {
-  const config = authConfig(env({ AUTH_MODE: 'access' }));
-  const url = new URL('https://portal.elevrics.ai/auth/login');
-  const response = await handleAuthRoute(new Request(url), url, config);
-  assert.equal(response.status, 404);
-});
-
 test('a half-configured deploy fails legibly at the login route', async () => {
-  const config = authConfig({ AUTH_MODE: 'enforce', SESSION_SECRET: SECRET });
+  const config = authConfig({ SESSION_SECRET: SECRET });
   assert.deepEqual(configErrors(config), ['WORKOS_CLIENT_ID', 'WORKOS_API_KEY']);
   const url = new URL('https://portal.elevrics.ai/auth/login');
   const response = await handleAuthRoute(new Request(url), url, config);
@@ -478,14 +496,21 @@ test('the JWKS is reachable with no session at all', async () => {
   assert.equal((await response.json()).keys.length, 1);
 });
 
-test('nothing is enforced when the env carries no auth config at all', async () => {
-  // The existing three-argument callers — the harness, the router tests — must
-  // keep routing exactly as before.
+test('an env with no auth config at all serves nothing, rather than everything', async () => {
+  // This is the inversion the Access removal forced, and it is the single most
+  // important line in this file. It used to pass: a three-argument caller got an
+  // unenforced router, which was safe only because Access was still in front.
+  // With one login and nothing behind it, "no config" has to mean closed.
   const response = await handleRequest(
     new Request('https://portal.elevrics.ai/'),
     async () => new Response('LAUNCHER'),
   );
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 503);
+  assert.deepEqual((await response.json()).missing, [
+    'WORKOS_CLIENT_ID',
+    'WORKOS_API_KEY',
+    'SESSION_SECRET',
+  ]);
 });
 
 test('the signed-out page is never decorated with the rail', async () => {

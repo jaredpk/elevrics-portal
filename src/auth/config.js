@@ -5,29 +5,21 @@
  * request and the unit tests need to hand in a fake one. `authConfig(env)` is
  * cheap enough to call per request and returns a frozen snapshot.
  *
- * THE MODE FLAG IS THE ROLLOUT.
+ * ONE LOGIN. The portal used to sit behind a Cloudflare Access application as
+ * well as its own accounts, and an `AUTH_MODE` flag ('access' → 'shadow' →
+ * 'enforce') sequenced the move between them. That rollout is over: the WorkOS
+ * session is the only way in, and there is no mode in which it is optional.
  *
- * Replacing Cloudflare Access is not a single deploy: the four Fly origins each
- * verify the Access JWT themselves (see the README — the router is explicitly
- * NOT the security boundary), so the moment Access comes off the portal
- * hostname they stop receiving `Cf-Access-Jwt-Assertion` and reject everything.
- * The order has to be: portal auth ships alongside Access → origins learn to
- * accept the portal's own assertion → Access comes off. `AUTH_MODE` is what
- * makes those three states expressible without three branches of the router.
+ * Removing the flag is deliberate rather than tidying. A three-state gate whose
+ * two permissive states are no longer reachable in production is a foot-gun
+ * with an environment variable attached — the one thing you never want to be
+ * able to set by accident is "authentication off". `enforcing` is now a
+ * property of the code, not of the deploy.
  *
- *   'access'  — today. Access gates at the edge, the rail shows its header,
- *               /auth/* is not mounted. The escape hatch if something is wrong.
- *   'shadow'  — /auth/* is live and a portal session is honoured and displayed,
- *               but Access is still in front and still authoritative. Nothing
- *               is blocked by the portal. This is where you verify the flow
- *               against real WorkOS without being able to lock yourself out.
- *   'enforce' — the portal session is required. Access can now be removed.
- *
- * Committed default is 'shadow' deliberately: a fresh deploy of this repo must
- * never be the thing that starts refusing requests.
+ * What replaces it as the safety net is `configErrors()` below: a deploy that
+ * is missing a WorkOS secret fails CLOSED and says which one, rather than
+ * falling back to an edge login that no longer exists. See `guard.js`.
  */
-
-export const AUTH_MODES = ['access', 'shadow', 'enforce'];
 
 /** Where the portal lives. Used to build absolute redirect and issuer URLs. */
 const DEFAULT_ORIGIN = 'https://portal.elevrics.ai';
@@ -50,14 +42,7 @@ export const SESSION_COOKIE = '__Host-elv_session';
 export const LOGIN_COOKIE = '__Host-elv_login';
 
 export function authConfig(env = {}) {
-  const mode = AUTH_MODES.includes(env.AUTH_MODE) ? env.AUTH_MODE : 'shadow';
   return Object.freeze({
-    mode,
-    /** /auth/* only exists once we are past the pure-Access state. */
-    enabled: mode !== 'access',
-    /** Does a missing session actually stop a request? */
-    enforcing: mode === 'enforce',
-
     clientId: env.WORKOS_CLIENT_ID ?? '',
     apiKey: env.WORKOS_API_KEY ?? '',
     apiBase: env.WORKOS_API_BASE ?? 'https://api.workos.com',
@@ -76,10 +61,12 @@ export function authConfig(env = {}) {
 /**
  * Is auth configured well enough to actually run?
  *
- * Checked before mounting /auth/*, so a half-configured deploy fails with a
- * legible 503 at the login route rather than a stack trace at the callback —
- * and, in 'enforce' mode, so it can refuse to lock everyone out over a missing
- * secret. See `guard.js`.
+ * Checked at the login route, so a half-configured deploy fails with a legible
+ * 503 naming the missing secret rather than a stack trace at the callback — and
+ * checked again in the guard, because with nothing else in front of the portal
+ * a missing secret is now the difference between "nobody can sign in" and
+ * "everybody is redirected to a sign-in that cannot work". Both answer 503; the
+ * guard's version says so without a redirect first. See `guard.js`.
  */
 export function configErrors(config) {
   const missing = [];

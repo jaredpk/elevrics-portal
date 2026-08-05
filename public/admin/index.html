@@ -40,8 +40,8 @@
       <p>Each client will be served at <code>{client}.elevrics.ai</code> by a
          single host-aware app, with its own Postgres schema. Provisioning a
          tenant should stay a database write — that depends on wildcard DNS,
-         a wildcard certificate and a wildcard Access policy being configured
-         before the first client is onboarded.</p>
+         a wildcard certificate and the portal's own organization model being
+         configured before the first client is onboarded.</p>
     </div>
   </section>
 
@@ -58,10 +58,11 @@
       </li>
       <li>
         <span class="step-n">2</span>
-        <span><strong>Wildcard Access policy.</strong>
-        <span class="detail">One Access application covering
-        <code>*.elevrics.ai</code>, scoped per tenant by email domain, so
-        onboarding never requires touching Cloudflare configuration.</span></span>
+        <span><strong>One tenant, one organization.</strong>
+        <span class="detail">A WorkOS organization per client, scoped by email
+        domain, so onboarding is an API call rather than a login to configure.
+        The portal already carries <code>org</code> in the session and in the
+        module assertion; nothing new has to be threaded through.</span></span>
       </li>
       <li>
         <span class="step-n">3</span>

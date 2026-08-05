@@ -6,25 +6,31 @@ for `portal.elevrics.ai`, without painting us into a corner for MFA, passkeys,
 SSO or organizations — and retire `finance.elevrics.ai` as a separate front door
 while we are in here.
 
+> **Status: done.** The rollout below has been carried out. WorkOS AuthKit is the
+> only login; the Cloudflare Access application is gone, and with it the
+> `AUTH_MODE` ladder that sequenced the move — see §6. Sections 1–4 are kept as
+> the record of *why* it is shaped this way, and section 1 describes the state
+> this started from, not the state now.
+
 ---
 
-## 1. Current state
+## 1. Starting state (historical)
 
-### Where auth lives today
+### Where auth lived before this work
 
-Nowhere in this repo. That is the finding that shapes everything else.
+Nowhere in this repo. That is the finding that shaped everything else.
 
-One Cloudflare Access application covers `portal.elevrics.ai`. Access
-authenticates at the edge — a one-time PIN emailed to an address on an allow
-policy — and every request that reaches the Worker is already authenticated. The
-Worker reads `Cf-Access-Authenticated-User-Email` and renders it at the foot of
-the rail, and `src/nav.js` is emphatic that this is **display only**.
+One Cloudflare Access application covered `portal.elevrics.ai`. Access
+authenticated at the edge — a one-time PIN emailed to an address on an allow
+policy — and every request that reached the Worker was already authenticated. The
+Worker read `Cf-Access-Authenticated-User-Email` and rendered it at the foot of
+the rail, and `src/nav.js` was emphatic that this was **display only**.
 
-The `Cf-Access-Jwt-Assertion` header is forwarded to each Fly origin unchanged,
-and **each origin verifies it itself** (`solayard-intel/app.py` verifies against
-`elevrics.cloudflareaccess.com`). That is not redundancy — the Fly hostnames stay
+The `Cf-Access-Jwt-Assertion` header was forwarded to each Fly origin unchanged,
+and **each origin verified it itself** (`solayard-intel/app.py` verified against
+`elevrics.cloudflareaccess.com`). That was not redundancy — the Fly hostnames stay
 publicly reachable, so a direct hit on `*.fly.dev` has to be rejected at the
-origin. It is why `src/router.js` can say it is a convenience layer and not a
+origin. It is why `src/router.js` could say it was a convenience layer and not a
 security boundary.
 
 | Fact | Consequence |
@@ -32,7 +38,7 @@ security boundary.
 | No users table, no `user_id`, no `tenant_id` anywhere (`docs/portal-feasibility.md`) | There are no existing users to migrate. There is no schema to change. |
 | No database in this repo. Worker + static assets, zero npm dependencies, no build step | An auth stack that needs a Node server, a bundler or a Postgres is a much bigger change than it looks. |
 | Access has no user store, no roles, no self-service, no invites | Everything past "is this email allowed" has to come from somewhere else. |
-| Every origin verifies the Access JWT independently | Removing Access without replacing that token turns four defended services into four open ones behind a proxy. **This is the sequencing constraint.** |
+| Every origin verified the Access JWT independently | Removing Access without replacing that token would turn four defended services into four open ones behind a proxy. **This was the sequencing constraint.** |
 | finapp's Plaid webhooks, MCP endpoint and OAuth server use `finapp-v3.fly.dev`, and `APP_URL` is pinned there | Machine callers do not depend on `finance.elevrics.ai`. It is safe to retire — and machine traffic arriving there is already a misconfiguration. |
 
 ### How portal and finance relate
@@ -120,10 +126,10 @@ KV; sessions older than it die at their next refresh, i.e. within the
 access-token lifetime. That is the right tool for a compromised credential; it is
 not an instant kill switch, and the code says so.
 
-### The piece that makes Access removable: a portal-issued assertion
+### The piece that made Access removable: a portal-issued assertion
 
-The origins verify a token today. They must keep verifying a token, because
-`*.fly.dev` stays reachable. So the portal issues its own:
+The origins verified a token before, and they must keep verifying a token,
+because `*.fly.dev` stays reachable. So the portal issues its own:
 
 ```
 X-Elevrics-Assertion:  ES256 JWT, 120s, aud = the module's routing prefix
@@ -175,13 +181,12 @@ Layered, and mostly not ours:
    missing. Generous enough that no real person meets it, and **fails open** — a
    limiter whose own storage outage takes sign-in down has inverted its job.
 
-### What happens to existing users
+### What happened to existing users
 
-Nothing to migrate. Access has no user store, and no application table has a
-`user_id`. The cutover is: create accounts in WorkOS for the emails currently on
-the Access policy, send invitations, verify sign-in works in `shadow` mode, then
-enforce. The Access allow-list stays in place as the safety net until the last
-step.
+Nothing to migrate. Access had no user store, and no application table has a
+`user_id`. The cutover was: create accounts in WorkOS for the emails on the
+Access policy, send invitations, verify sign-in in `shadow` mode, then enforce.
+The Access allow-list stayed in place as the safety net until the last step.
 
 ### Future paths this preserves
 
@@ -259,8 +264,8 @@ are `__Host-` prefixed, which cannot carry a `Domain` at all.
 
 | Risk | Mitigation |
 |---|---|
-| **Locking ourselves out.** `enforce` before WorkOS is configured, or with a broken `SESSION_SECRET`. | `AUTH_MODE` ships as `shadow`; Access stays in front until the last step; a missing secret produces a 503 at `/auth/login` naming which one. Keep an Access policy until `enforce` has been exercised. |
-| **Origins reject everything** when Access comes off, because they still expect `Cf-Access-Jwt-Assertion`. | The whole point of the mode ladder. Do not remove Access until all four origins accept the portal assertion. The assertion is minted in `shadow` mode too, so origins can be migrated one at a time while Access is still enforcing. |
+| **Locking ourselves out.** A deploy with WorkOS unconfigured or a broken `SESSION_SECRET`, now that nothing sits in front. | Fails **closed and named**: every non-public path answers `503 auth_not_configured` listing the missing secret, rather than redirecting into a sign-in that cannot complete. Recovery is `wrangler tail` (every callback refusal logs a short `reason`) plus `wrangler rollback`. There is deliberately no bypass flag — one would be an "authentication off" switch living in the deployed Worker. |
+| **Origins reject everything** once Access came off, because they still expected `Cf-Access-Jwt-Assertion`. | This was the whole point of the mode ladder, and it is why the ladder was not removed until after the origins were migrated. The assertion was minted in `shadow` mode too, so origins moved one at a time while Access was still enforcing. |
 | **The router becomes the only boundary** and someone stops verifying at the origin. | Called out in `src/router.js`. `*.fly.dev` stays reachable; per-origin verification is not optional. |
 | **Header spoofing** of `X-Elevrics-Assertion`. | Blanket prefix strip before minting, tested. |
 | **Open redirect** via `?next=`. | Same-origin paths only; `//`, `\` and absolute URLs rejected, tested. |
@@ -283,7 +288,10 @@ Automated (`npm test`, 107 tests):
 - [x] Role denial when a role is required and none is held
 - [x] `/admin` gated despite not being a proxied module
 - [x] Navigation → 302; fetch → 401
-- [x] `/auth/*` absent in `access` mode; 503 when half-configured
+- [x] 503 naming the missing secret when half-configured — at `/auth/login` and
+      at the guard, so an unconfigured deploy serves nothing rather than everything
+- [x] No `AUTH_MODE` value, known or invented, stands the gate down
+- [x] An `X-Elevrics-*` or `Cf-Access-*` identity header on the request is not a viewer
 - [x] Callback refuses mismatched / missing / expired state before spending the code
 - [x] Sign-out is POST-only and ends the WorkOS session
 - [x] `/auth/session` leaks neither token
@@ -291,9 +299,10 @@ Automated (`npm test`, 107 tests):
 - [x] JWKS never publishes `d`; publishes both keys mid-rotation
 - [x] Inbound `X-Elevrics-*` stripped
 - [x] Retired host: 301 with the path preserved, machine-path 410, never a module
-- [x] Three-argument `handleRequest` callers still route unchanged
+- [x] A three-argument `handleRequest` call (no env) serves 503, not everything
 
-Manual, needs a deploy (`wrangler dev` has no Access and no WorkOS in front):
+Manual, needs a deploy (`wrangler dev` cannot complete a WorkOS round trip — the
+redirect URI has to be a real hostname):
 
 - [ ] Sign up → verification email → verify → land in the portal
 - [ ] Sign in → land on the page you originally asked for, not `/`
@@ -305,4 +314,36 @@ Manual, needs a deploy (`wrangler dev` has no Access and no WorkOS in front):
 - [ ] Rail and quick-switcher still render inside the proxied modules
 - [ ] `finance.elevrics.ai/accounts` → the same page in the portal (only if routed)
 - [ ] `finance.elevrics.ai/api/plaid/webhook` → 410, and Plaid still delivers to Fly
-- [ ] One origin migrated to the assertion still works with Access in front
+- [ ] Every origin accepts the portal assertion with no Access application in front
+
+---
+
+## 6. Removing the second login
+
+The rollout above left the portal with **two** logins for its duration: Cloudflare
+Access at the edge and WorkOS behind it. That was correct while the origins were
+being migrated and wrong the moment they were done. Both are no longer needed, so:
+
+### Out of repo
+
+1. **Cloudflare → Zero Trust → Access → Applications** — delete the application
+   covering `portal.elevrics.ai`. Nothing else in Zero Trust references it.
+2. **Each origin** — drop the `Cf-Access-Jwt-Assertion` branch, keeping only the
+   `X-Elevrics-Assertion` verifier it has been running alongside it. Do this
+   *after* step 1, not before: an origin that accepts both is the state that
+   makes step 1 safe, and an origin that accepts neither is an outage.
+3. **Keep the emails.** Accounts live in WorkOS now; the Access allow-policy was
+   the last thing referencing them at Cloudflare and it goes with the application.
+
+### In repo
+
+| Removed | Why it could not just be left in place |
+|---|---|
+| `AUTH_MODE` and the three-state ladder | Two of its three states mean "the portal does not enforce". With nothing in front of the portal, a var that can be set to `shadow` is a var that can turn authentication off — and its default *was* `shadow`. |
+| `viewerFor()` reading `Cf-Access-Authenticated-User-Email` | Access set that header and stripped any inbound copy. With Access gone it is a header any client can type, so reading it would be trusting attacker-controlled input for the identity shown in the rail. |
+| The bare-string viewer shape in `nav.js` | It existed only to carry that header. One identity source, one shape — and a footer now always implies a session that can be signed out of. |
+| The unenforced path for a three-argument `handleRequest` | It was safe only because Access was in front. `npm run harness` now mints a real sealed session with a per-process secret instead, which exercises the same code path a real user does rather than a path that only exists with auth off. |
+
+**What did not change:** the assertion, the per-origin verification, and the rule
+that `*.fly.dev` stays reachable so the router must never be the only boundary.
+Removing a login must not quietly remove a defence.

@@ -10,6 +10,7 @@
 
 import { JWKS_PATH } from './assertion.js';
 import { isAuthRoute } from './routes.js';
+import { configErrors } from './config.js';
 
 /**
  * Reachable without a session.
@@ -73,11 +74,29 @@ function isNavigation(request) {
 /**
  * The response for a request that has no session, or the wrong role.
  *
+ * There is no mode in which this does nothing. The portal session is the only
+ * login, so "enforcing" is not a deploy-time choice — see config.js.
+ *
  * @returns a Response, or null when the request may proceed.
  */
 export function gate(request, url, session, { config, requiredRole } = {}) {
-  if (!config.enforcing) return null;
   if (isPublicPath(url.pathname)) return null;
+
+  // A deploy missing a WorkOS secret cannot mint a session and cannot complete
+  // a sign-in. Say that, rather than bouncing every request to a login route
+  // that will only answer 503 one redirect later — and note the ORDER: this is
+  // checked before the session, so it fails closed. There is no longer an edge
+  // login behind us to fall back to.
+  const missing = configErrors(config);
+  if (missing.length) {
+    return new Response(JSON.stringify({ error: 'auth_not_configured', missing }, null, 2), {
+      status: 503,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
 
   if (!session) {
     if (!isNavigation(request)) {

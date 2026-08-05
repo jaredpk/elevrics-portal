@@ -393,8 +393,8 @@ html.elv-rail-pinned .elv-rail-kbd {
 
 /* ---------- Who is signed in ----------
    Pinned below the links. Collapsed, the initial alone is the marker; opening
-   the rail reveals the address. Cloudflare Access already knew this on every
-   request — the portal just never showed it. */
+   the rail reveals the address. Only ever rendered for a real portal session,
+   so the footer's presence is what makes the sign-out control meaningful. */
 
 .elv-rail-foot {
   display: flex;

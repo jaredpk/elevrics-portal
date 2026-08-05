@@ -1,15 +1,14 @@
 /**
- * The identity assertion the modules verify — the piece that lets Cloudflare
+ * The identity assertion the modules verify — the piece that let Cloudflare
  * Access come off without every origin becoming open.
  *
- * THE PROBLEM THIS SOLVES. Today each Fly origin verifies
+ * THE PROBLEM THIS SOLVES. Each Fly origin used to verify
  * `Cf-Access-Jwt-Assertion` itself against `elevrics.cloudflareaccess.com`,
  * because the Fly hostnames stay publicly reachable and a direct hit on
  * `*.fly.dev` has to be rejected AT THE ORIGIN, not at the router. That property
- * is the reason the README can say the router is a convenience layer rather than
- * a security boundary, and it must survive the move off Access — otherwise
- * replacing the login also silently converts four independently-defended
- * services into four open ones behind a proxy.
+ * had to survive the move off Access — otherwise replacing the login also
+ * silently converts four independently-defended services into four open ones
+ * behind a proxy.
  *
  * So the portal issues its own equivalent: a 2-minute ES256 JWT, one per
  * request, sent as `X-Elevrics-Assertion`. An origin verifies it exactly the way

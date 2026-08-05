@@ -1,24 +1,17 @@
 /**
  * Portal router.
  *
- * WHO DECIDES WHETHER A REQUEST IS ALLOWED is in the middle of changing, and
- * this file is where the transition is expressed. It used to be one sentence:
- * portal.elevrics.ai sits behind ONE Cloudflare Access application, so every
- * request that reaches this router is already authenticated, and
- * Cf-Access-Jwt-Assertion rides along to each origin unchanged because the
- * origins verify it themselves — the Fly hostnames stay publicly reachable, so a
- * direct hit on *.fly.dev has to be rejected there, not here.
+ * WHO DECIDES WHETHER A REQUEST IS ALLOWED is this file, now. There used to be
+ * a Cloudflare Access application in front of portal.elevrics.ai as well, so
+ * every request arriving here was already authenticated at the edge and
+ * Cf-Access-Jwt-Assertion rode along to each origin. That second login is gone:
+ * the portal runs its own accounts (WorkOS AuthKit, see src/auth/) and mints its
+ * own short-lived assertion for the origins.
  *
- * That last property is not changing. What changes is who issues the token the
- * origins verify: the portal now runs its own accounts (WorkOS AuthKit, see
- * src/auth/) and mints its own short-lived assertion. `AUTH_MODE` selects which
- * state we are in — 'access' (as before), 'shadow' (portal sessions exist
- * alongside Access), 'enforce' (portal session required, Access removable). See
- * src/auth/config.js; the ordering constraint is written out there.
- *
- * In 'enforce' mode this router IS a security boundary for the portal hostname.
- * It is still not the only one, and must not become the only one: every origin
- * keeps verifying for itself, because *.fly.dev is still reachable directly.
+ * So this router IS a security boundary for the portal hostname. It is still
+ * not the ONLY one, and must not become the only one: the Fly hostnames stay
+ * publicly reachable, so every origin keeps verifying the assertion for itself
+ * — a direct hit on *.fly.dev has to be rejected there, not here.
  *
  * Anything that doesn't match a module prefix falls through to the static
  * shell (launcher at /, admin console at /admin).
@@ -34,7 +27,7 @@
  */
 
 import { MODULES, matchComingSoon, requiredRoleFor } from './modules.js';
-import { isDocumentRequest, viewerFor } from './chrome.js';
+import { isDocumentRequest } from './chrome.js';
 import { renderComingSoon } from './nav.js';
 import { matchRetiredHost, handleRetiredHost } from './retired.js';
 import { authConfig } from './auth/config.js';
@@ -54,12 +47,12 @@ export { MODULES };
 /**
  * Hostnames parked on this Worker that are NOT the portal.
  *
- * These are public — no Access application covers them — so module proxying
- * must never apply here. Without this guard, pathfinder.elevrics.ai/solayard
- * would proxy to the internal dashboard. The origins would still reject it for
- * carrying no Access token, but it would confirm to an anonymous visitor that
- * the module exists, and it relies on the origin to catch something this
- * router should never have forwarded.
+ * These are public — the sign-in gate is per path, and these paths serve a
+ * placeholder — so module proxying must never apply here. Without this guard,
+ * pathfinder.elevrics.ai/solayard would proxy to the internal dashboard. The
+ * origins would still reject it for carrying no valid assertion, but it would
+ * confirm to an anonymous visitor that the module exists, and it relies on the
+ * origin to catch something this router should never have forwarded.
  *
  * Every path on a parked host serves its placeholder, which is self-contained
  * (inline CSS) so there are no sub-resources to route.
@@ -185,12 +178,12 @@ export async function handleRequest(request, serveAssets, injectChrome, env = {}
   // `withCookies` on every exit below rather than a mutation here.
   const { session, cookies } = await readSession(request, config);
 
-  // The portal's own account wins; the Access header remains the fallback for
-  // as long as Access is still in front. One line, and it is what lets 'shadow'
-  // mode show a real portal identity in the rail before anything depends on it.
+  // The one identity there is. Null renders no footer at all rather than an
+  // empty "Signed in as" — which is what `wrangler dev` shows, since a local
+  // run has no session and nothing in front of it to invent one.
   const viewer = session
-    ? { email: session.email, name: session.name, signOut: true, impersonator: session.impersonator }
-    : viewerFor(request);
+    ? { email: session.email, name: session.name, impersonator: session.impersonator }
+    : null;
 
   const match = matchModule(url.pathname);
 
@@ -250,10 +243,10 @@ export async function handleRequest(request, serveAssets, injectChrome, env = {}
   if (mod.stripPrefix) proxied.headers.set('X-Forwarded-Prefix', prefix);
 
   // The portal's own identity assertion: signed, 2 minutes, audience-bound to
-  // this module. This is what an origin verifies once it stops verifying the
-  // Cloudflare Access token — see src/auth/assertion.js. Absent until a signing
-  // key is configured, which is what makes the rollout incremental: origins can
-  // start accepting it while Access is still the thing being enforced.
+  // this module. This is what each origin verifies, in place of the Cloudflare
+  // Access token it used to — see src/auth/assertion.js. Absent until a signing
+  // key is configured, and an origin that verifies properly rejects a request
+  // without one, so `ASSERTION_SIGNING_KEY` is not optional in practice.
   const assertion = await mintAssertion(config, session, prefix);
   if (assertion) proxied.headers.set(ASSERTION_HEADER, assertion);
 
