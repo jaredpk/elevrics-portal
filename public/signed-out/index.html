@@ -38,9 +38,15 @@
     <a class="elv-gate-action" href="/auth/login">Sign in again</a>
   </p>
 
+  <!-- No "create an account" link. Sign-up is disabled in WorkOS: the portal is
+       invite-only, and invited people arrive on an invitation link rather than
+       through /auth/signup. Offering the link anyway would send them to a
+       provider refusal, which reads as the portal being broken rather than as
+       the portal being closed. The route still exists — re-enabling sign-up is
+       a dashboard toggle, and this line comes back with it. -->
   <p class="elv-gate-note">
-    New here? <a href="/auth/signup">Create an account</a> — access is granted
-    per account, so a new one won't see anything until it's cleared.
+    Access is by invitation. If you need an account, ask whoever runs the portal
+    to send you one.
   </p>
 </main>
 
