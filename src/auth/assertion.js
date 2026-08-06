@@ -119,6 +119,19 @@ export function stripInboundAssertions(headers) {
  * no cookie and no way to get one, and a JWKS behind a login is a JWKS nobody
  * can use. It is public key material; that is what public key material is for.
  *
+ * "WITHOUT A SESSION" IS NOT ENOUGH — IT MUST BE REACHABLE WITHOUT LOOKING HUMAN.
+ * This Worker cannot enforce that on its own. Cloudflare's bot protection runs
+ * at the edge, BEFORE the Worker, so a request it scores as automated is
+ * refused with a 403 that this code never sees. That is not hypothetical: it
+ * took solayard-intel down completely, because PyJWKClient fetches through
+ * urllib and "Python-urllib/3.x" is filtered. curl from a laptop worked the
+ * whole time, which is exactly what made it hard to find.
+ *
+ * So this path needs a WAF skip / bot-protection exemption in the dashboard,
+ * and that requirement belongs here rather than in an origin's troubleshooting
+ * notes: the alternative is every origin guessing a user-agent that gets
+ * through, in a different language each time. See the README.
+ *
  * Two keys are publishable at once (`ASSERTION_SIGNING_KEY_NEXT`), which is what
  * makes rotation a sequence rather than an outage: publish both, switch signing,
  * retire the old one after every origin's JWKS cache has turned over.

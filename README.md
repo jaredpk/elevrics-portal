@@ -316,6 +316,18 @@ keeps verifying for itself — `*.fly.dev` is still reachable directly.
 `ASSERTION_SIGNING_KEY` is therefore not optional in practice: without it no
 assertion is minted, and an origin that verifies properly rejects the request.
 
+**The JWKS path needs a bot-protection exemption**, and this is not optional
+either. Cloudflare's bot filtering runs at the edge, before the Worker, so it
+can refuse an origin's fetch with a 403 the Worker never sees — and an origin
+that cannot load the JWKS refuses every request, which presents as a total
+auth outage with no clue in it. This is not theoretical: it took
+`solayard-intel` down, because `PyJWKClient` fetches through urllib and
+`Python-urllib/3.x` is filtered. `curl` from a laptop succeeded throughout.
+
+Add a WAF skip rule for `/.well-known/portal-jwks.json`. Origins should also
+send an identifying `User-Agent`, but that is a courtesy on their side — the
+endpoint is published for machines, so the edge is where this belongs.
+
 ### Roles
 
 `requiresRole` in `src/modules.js`. Its *absence* means "any signed-in account",
