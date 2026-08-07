@@ -491,8 +491,14 @@ One-time Cloudflare setup:
 3. Set `URL_PREFIX` on the two prefix-stripped Fly apps
    (`fly secrets set URL_PREFIX=/solayard`, `.../opportunities`).
 4. Add a rate-limiting rule on `/auth/*` (see Authentication above — the
-   in-Worker limiter is only the backstop).
-5. Route `pathfinder.elevrics.ai` and `finance.elevrics.ai` at this Worker too.
+   in-Worker limiter is only the backstop). `/auth/*` is publicly reachable now
+   that nothing sits in front of the portal, so this is the real limiter.
+5. Add a WAF custom rule: **Skip → Browser Integrity Check** on
+   `/.well-known/portal-jwks.json`. BIC is on by default and refuses
+   non-browser user agents with a 403 the Worker never sees — see Authentication
+   above. Without it an origin can be unable to load the key and refuse
+   everything, which presents as an auth bug rather than an edge setting.
+6. Route `pathfinder.elevrics.ai` and `finance.elevrics.ai` at this Worker too.
    The parked-host and retired-host guards are both host-matched, so neither
    does anything until the hostname actually arrives here.
 

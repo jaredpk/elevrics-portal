@@ -302,19 +302,27 @@ Automated (`npm test`, 107 tests):
 - [x] A three-argument `handleRequest` call (no env) serves 503, not everything
 
 Manual, needs a deploy (`wrangler dev` cannot complete a WorkOS round trip — the
-redirect URI has to be a real hostname):
+redirect URI has to be a real hostname). Checked during the August 2026 cutover:
 
-- [ ] Sign up → verification email → verify → land in the portal
-- [ ] Sign in → land on the page you originally asked for, not `/`
+- [x] Sign in → the portal, with no Cloudflare Access in front of it
+- [x] Sign out → `/signed-out/` → signing in again prompts for credentials
+- [x] All four origins accept the portal assertion with no Access application
+
+Still unverified. Left unticked deliberately — an unchecked box is worth more
+than a ticked one nobody exercised:
+
 - [ ] Password reset end to end
-- [ ] Sign out → `/signed-out/` → sign in again prompts for credentials
 - [ ] Session survives an access-token expiry (wait past it, reload)
 - [ ] `/admin/` as a non-admin → 403, not a sign-in loop
 - [ ] A module XHR after expiry gets 401 JSON, not an HTML login page
 - [ ] Rail and quick-switcher still render inside the proxied modules
 - [ ] `finance.elevrics.ai/accounts` → the same page in the portal (only if routed)
 - [ ] `finance.elevrics.ai/api/plaid/webhook` → 410, and Plaid still delivers to Fly
-- [ ] Every origin accepts the portal assertion with no Access application in front
+
+No longer applicable: sign-up is disabled in WorkOS — the portal is invite-only,
+so there is no self-service registration round trip to test. Invited people
+arrive on an invitation link. Re-enabling it is a dashboard toggle, and the
+`/auth/signup` route is still mounted for that day.
 
 ---
 
@@ -347,3 +355,67 @@ being migrated and wrong the moment they were done. Both are no longer needed, s
 **What did not change:** the assertion, the per-origin verification, and the rule
 that `*.fly.dev` stays reachable so the router must never be the only boundary.
 Removing a login must not quietly remove a defence.
+
+---
+
+## 7. Operating constraints found during the cutover
+
+Three things that are not visible in the code and each cost real time to
+discover. They belong here because each one is a decision or a deploy step, not
+a bug to fix.
+
+### The JWKS path must be exempt from bot protection
+
+`/.well-known/portal-jwks.json` is served without a session on purpose. That is
+necessary but not sufficient: it must also be reachable by something that does
+not look like a browser.
+
+Cloudflare's Browser Integrity Check is on by default, runs at the edge *ahead
+of the Worker*, and refuses non-standard user agents with a 403 the Worker never
+sees and cannot log. `PyJWKClient` fetches through urllib, so `solayard-intel`
+could not load the key and refused every request — a total auth outage on that
+module, presenting as "invalid token". `curl` from a laptop returned the key
+throughout, and the three JavaScript origins were unaffected because `jose`
+fetches via undici. One origin failing while three worked is what located it.
+
+Add a WAF custom rule: **Skip → Browser Integrity Check** for that path. Origins
+should also send an identifying `User-Agent`, but that is a courtesy on their
+side; the endpoint is published for machines, so the edge is where this belongs.
+
+### Passkeys bind to the AuthKit domain, and that sets an ordering
+
+A passkey is bound to the origin that ran the WebAuthn ceremony. Enrol one on
+`<generated>.authkit.app` and it stops working the day a custom AuthKit domain
+is configured — every user re-enrols, with no migration path. That binding is
+the phishing resistance, so it is not something to design around.
+
+The rule this produces: **custom domain before clients, clients before clients'
+passkeys.** For a single operator it does not matter — re-enrolling one account
+takes seconds. For the `{client}.elevrics.ai` tier it is a forced re-enrolment
+across every client's staff, which is a bad first impression from a vendor.
+
+This also means the custom domain stops being cosmetic at that point. It becomes
+the permanent anchor client credentials are bound to, which is an argument for
+picking a name that will never change.
+
+### Costs, and the two that scale
+
+AuthKit is free to 1M monthly active users. Passkeys, MFA, magic auth,
+organizations and roles are included. At 100 clients none of that costs
+anything.
+
+Two things do:
+
+- **AuthKit custom domain — $99/month.** Deferred. Cosmetic today; buy it before
+  clients enrol passkeys (above).
+- **Enterprise SSO — priced per connection**, roughly $125 each falling to ~$65
+  at volume. One connection is one client organization using SAML or Directory
+  Sync. 100 SSO clients is on the order of $6,500/month — about 65× the domain
+  fee, and the reason SSO belongs in a paid tier of your own pricing rather than
+  the base plan. Verify current rates before building a model on them.
+
+Neither changes the architecture. `src/auth/workos.js` is the whole provider
+surface — six functions, three `fetch` calls — so if the SSO economics ever
+justify self-hosting the SAML side (BoxyHQ Jackson is the usual answer), it
+slots in behind that seam without touching the session, the guard, the assertion
+or any origin.
