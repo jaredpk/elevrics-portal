@@ -98,6 +98,12 @@ before first paint, a deferred `/js/portal.js` for the toggle, and an
 `elv-chrome` class on `<html>` — set server-side, so the body inset that clears
 the fixed rail is right even with JavaScript off.
 
+Proxied modules additionally have their own `<link rel="icon">` tags *removed*
+and the portal's substituted. A module rendering inside a portal tab should not
+advertise its own identity in the tab strip, and leaving both sets in place
+makes the winner the browser's choice rather than ours. Portal-owned pages
+declare the same icons in their own HTML, so they need no injection.
+
 Two guards matter:
 
 - **Per-module opt-in.** `injectChrome` in the registry, so origins are
@@ -231,6 +237,28 @@ confirm to an anonymous visitor that the module exists. Asserted in `tests/`.
 
 A parked host is answered before the sign-in gate and serves nothing but its
 placeholder — that is the point. Do not put a login in front of one.
+
+That also rules out a favicon link on the placeholder: every path on a parked
+host serves the placeholder, so `/favicon.svg` there would return HTML, not an
+image, and the tab would show a broken icon rather than none. Giving a parked
+host its own icon means inlining a `data:` URI in that page.
+
+### The tab icon
+
+The same three-bar mark as `elevrics.ai`, inverted white onto the brand teal
+(`#00A19A`) where the site uses navy (`#071833`) — so a portal tab is
+distinguishable from a marketing-site tab at 16px. A dark-teal plate was tried
+first and read as identical to the site's navy at tab size, which defeated the
+purpose.
+
+`public/favicon.svg` is the source of truth for the shape. The `.ico` (16/32/48)
+and the 180px `apple-touch-icon.png` are generated from the same geometry by
+`scripts/render-favicon.py` — plain `python3`, no dependencies, because this
+repo has none and a rounded rect with a vertical gradient does not justify a
+Pillow install. Edit the SVG and the script's `VARIANTS` entry together.
+
+All three paths are on the guard's public allowlist, and have to be: the browser
+requests them on `/signed-out/`, which by definition has no session.
 
 ---
 

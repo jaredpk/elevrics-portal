@@ -148,6 +148,18 @@ test('the public allowlist covers the sign-in surface and nothing else', () => {
   }
 });
 
+test('every tab-icon format is reachable signed out, not just the .ico', () => {
+  // The browser asks for these on /signed-out/, which has no session by
+  // definition. Gated, they 302 to sign-in and the tab shows a blank page icon.
+  for (const icon of ['/favicon.ico', '/favicon.svg', '/apple-touch-icon.png']) {
+    assert.ok(isPublicPath(icon), `should be public: ${icon}`);
+  }
+  // Exact paths, not a prefix: neighbours must not ride along.
+  for (const closed of ['/favicon.svg/../', '/apple-touch-icon.png/secret', '/icons/', '/favicon']) {
+    assert.ok(!isPublicPath(closed), `should NOT be public: ${closed}`);
+  }
+});
+
 test('a required role denies a session that carries none', () => {
   assert.ok(hasRole({ roles: ['admin'] }, 'admin'));
   assert.ok(hasRole({ roles: ['member'] }, null), 'no requirement means any account');

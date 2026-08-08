@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>Elevrics Portal</title>
+  <!-- Same three-bar mark as elevrics.ai, inverted onto the brand teal so a
+       portal tab is distinguishable from a marketing-site tab at 16px. The
+       dark-teal-plate alternative tested indistinguishable from the site's
+       navy at tab size, which defeats the point. -->
+  <defs>
+    <linearGradient id="p1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="100%" stop-color="#E6F2F1"/></linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#00A19A"/>
+  <rect x="9"  y="33.9" width="12" height="17.1" rx="3" fill="url(#p1)"/>
+  <rect x="26" y="23.45" width="12" height="27.55" rx="3" fill="url(#p1)"/>
+  <rect x="43" y="13"   width="12" height="38"    rx="3" fill="url(#p1)"/>
+</svg>

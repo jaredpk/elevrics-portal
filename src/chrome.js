@@ -45,6 +45,15 @@ const BEHAVIOUR = `<script src="/js/portal.js" defer></script>`;
 /** Same origin as the portal, so a proxied page can load it by absolute path. */
 const CHROME_CSS = `<link rel="stylesheet" href="/css/chrome.css">`;
 
+/**
+ * The tab icon, for the same reason the rail is here: a proxied module is a
+ * portal tab, and it should not advertise the module's own identity in the tab
+ * strip. Absolute paths, resolving to the portal origin like CHROME_CSS.
+ */
+const FAVICON = `<link rel="icon" href="/favicon.ico" sizes="32x32">` +
+  `<link rel="icon" href="/favicon.svg" type="image/svg+xml">` +
+  `<link rel="apple-touch-icon" href="/apple-touch-icon.png">`;
+
 /** Does this response carry markup we can rewrite? */
 function isHtml(response) {
   return (response.headers.get('Content-Type') ?? '').includes('text/html');
@@ -77,10 +86,24 @@ export function makeChromeInjector(HTMLRewriterCtor) {
       .on('head', {
         element(el) {
           if (standalone) el.append(CHROME_CSS, { html: true });
+          if (standalone) el.append(FAVICON, { html: true });
           el.append(BOOT, { html: true });
           el.append(BEHAVIOUR, { html: true });
         },
       });
+
+    // Drop the module's own icons rather than appending ours alongside them.
+    // With two candidates the choice is the browser's, and "usually the last
+    // one wins" is not a behaviour to hang a consistent tab strip on. Both
+    // selectors are needed: `rel~="icon"` matches `icon` and `shortcut icon`
+    // but not the single token `apple-touch-icon`.
+    if (standalone) {
+      rewriter = rewriter.on('link[rel~="icon"], link[rel~="apple-touch-icon"]', {
+        element(el) {
+          el.remove();
+        },
+      });
+    }
 
     if (standalone) {
       rewriter = rewriter.on('body', {

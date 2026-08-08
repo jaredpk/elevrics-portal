@@ -24,13 +24,31 @@ import { configErrors } from './config.js';
  *                  third-party origins by design, so none of it is secret — and
  *                  a login page that renders unstyled reads as broken.
  *   /favicon.ico   requested by the browser before any redirect resolves.
+ *   /favicon.svg   the same request in the format modern browsers prefer, and
+ *   /apple-touch-  the one iOS asks for. Gated, both 302 to sign-in and the tab
+ *   icon.png       falls back to a blank page icon on /signed-out/ — the one
+ *                  page a signed-out visitor is meant to see. Icons are public
+ *                  by nature: the site serves the same mark unauthenticated.
  *   /robots.txt    read by crawlers, which by definition have no session.
  *   /healthz       uptime checks, which by definition have no session either.
  *
  * Note what is NOT here: '/' and '/admin/'.
+ *
+ * The icons are exact paths rather than an '/icons/' prefix: a prefix is a
+ * standing grant to whatever gets filed under it later, and three files do not
+ * need one.
  */
 const PUBLIC_PREFIXES = ['/css/', '/js/'];
-const PUBLIC_PATHS = new Set([JWKS_PATH, '/signed-out', '/signed-out/', '/favicon.ico', '/robots.txt', '/healthz']);
+const PUBLIC_PATHS = new Set([
+  JWKS_PATH,
+  '/signed-out',
+  '/signed-out/',
+  '/favicon.ico',
+  '/favicon.svg',
+  '/apple-touch-icon.png',
+  '/robots.txt',
+  '/healthz',
+]);
 
 export function isPublicPath(pathname) {
   if (isAuthRoute(pathname)) return true;
